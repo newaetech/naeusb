@@ -39,6 +39,18 @@ bool usart_setup_out_received(void)
     case REQ_USART0_DATA:
         udd_g_ctrlreq.callback = ctrl_usart_cb_data;
         return true;
+    case REQ_XMEGA_PROGRAM:
+        /*
+        udd_g_ctrlreq.payload = xmegabuffer;
+        udd_g_ctrlreq.payload_size = min(udd_g_ctrlreq.req.wLength,	sizeof(xmegabuffer));
+        */
+        udd_g_ctrlreq.callback = ctrl_xmega_program_void;
+        return true;
+
+		/* AVR Programming */
+    case REQ_AVR_PROGRAM:
+        udd_g_ctrlreq.callback = ctrl_avr_program_void;
+        return true;
     }
 }
 
@@ -59,6 +71,14 @@ bool usart_setup_in_received(void)
         udd_g_ctrlreq.payload_size = cnt;
         return true;
         break;
+
+		case REQ_XMEGA_PROGRAM:
+			return XPROGProtocol_Command();
+			break;
+			
+		case REQ_AVR_PROGRAM:
+			return V2Protocol_ProcessCommand();
+			break;
     }
 }
 

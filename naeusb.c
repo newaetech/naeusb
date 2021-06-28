@@ -52,6 +52,9 @@ void main_sof_action(void)
 }
 volatile uint8_t started_read = 0;
 
+void main_vendor_bulk_out_received(udd_ep_status_t status,
+                                   iram_size_t nb_transfered, udd_ep_id_t ep);
+
 bool main_vendor_enable(void)
 {
     active = true;
@@ -59,10 +62,10 @@ bool main_vendor_enable(void)
     // Start data reception on OUT endpoints
 // #if UDI_VENDOR_EPS_SIZE_BULK_FS
 //     //main_vendor_bulk_in_received(UDD_EP_TRANSFER_OK, 0, 0);
-//     udi_vendor_bulk_out_run(
-//         main_buf_loopback,
-//         sizeof(main_buf_loopback),
-//         main_vendor_bulk_out_received);
+    udi_vendor_bulk_out_run(
+        main_buf_loopback,
+        sizeof(main_buf_loopback),
+        main_vendor_bulk_out_received);
 // #endif
     return true;
 }

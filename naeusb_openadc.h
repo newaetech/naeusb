@@ -1,5 +1,6 @@
 #pragma once
 #include "naeusb.h"
+#include "fpga_program.h"
 
 #define REQ_MEMREAD_BULK 0x10
 #define REQ_MEMWRITE_BULK 0x11

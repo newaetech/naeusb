@@ -196,6 +196,16 @@ bool openadc_setup_in_received(void)
 
         return true;
         break;
+
+    case REQ_FPGA_STATUS:
+        respbuf[0] = FPGA_ISDONE();
+        respbuf[1] = 0;
+        respbuf[2] = 0;
+        respbuf[3] = 0;
+        udd_g_ctrlreq.payload = respbuf;
+        udd_g_ctrlreq.payload_size = 4;
+        return true;
+        break;
     }
     return false;
 }
@@ -248,4 +258,8 @@ void openadc_register_handlers(void)
 {
     naeusb_add_in_handler(openadc_setup_in_received);
     naeusb_add_out_handler(openadc_setup_out_received);
+	udi_vendor_bulk_out_run(
+		main_buf_loopback,
+		sizeof(main_buf_loopback),
+		main_vendor_bulk_out_received);
 }
