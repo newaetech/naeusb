@@ -63,12 +63,22 @@ void exit_cs(void)
   FPGA_releaselock();
   cpu_irq_leave_critical();
 }
+#ifndef PIN_EBI_USB_SPARE1
+#define PIN_EBI_USB_SPARE1 FPGA_ALE_GPIO
+#endif
 
 void FPGA_setaddr(uint32_t addr)
 {
-  FPGA_ADDR_PORT->PIO_ODSR = (FPGA_ADDR_PORT->PIO_ODSR & 0x40) | (addr & 0x3F) | ((addr & 0xC0) << 1);
-  gpio_set_pin_low(PIN_EBI_USB_SPARE1);
-  gpio_set_pin_high(PIN_EBI_USB_SPARE1);
+	#if USB_DEVICE_PRODUCT_ID == 0xACE5
+	//husky
+	  FPGA_ADDR_PORT->PIO_ODSR = (FPGA_ADDR_PORT->PIO_ODSR & 0x40) | (addr & 0x3F) | ((addr & 0xC0) << 1);
+	  gpio_set_pin_low(PIN_EBI_USB_SPARE1);
+	  gpio_set_pin_high(PIN_EBI_USB_SPARE1);
+	#else
+			pio_sync_output_write(FPGA_ADDR_PORT, addr);
+			gpio_set_pin_low(FPGA_ALE_GPIO);
+			gpio_set_pin_high(FPGA_ALE_GPIO);
+	#endif
 }
 
 /*
