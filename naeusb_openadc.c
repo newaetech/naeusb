@@ -53,7 +53,6 @@ void openadc_readmem_bulk(void)
         )) {
             //abort
         }
-    FPGA_releaselock();
 }
 
 void openadc_writemem_bulk(void)
@@ -69,7 +68,6 @@ void openadc_writemem_bulk(void)
     FPGA_setaddr(address);
 
     /* Transaction done in generic callback */
-    FPGA_releaselock();
 
 }
 
@@ -91,7 +89,6 @@ void openadc_readmem_ctrl(void)
     ctrlmemread_size = buflen;
 
     /* Start Transaction */
-    FPGA_releaselock();
     
 }
 
@@ -126,6 +123,7 @@ void main_vendor_bulk_in_received(udd_ep_status_t status,
 {
     UNUSED(nb_transfered);
     UNUSED(ep);
+    FPGA_releaselock();
     if (UDD_EP_TRANSFER_OK != status) {
         return; // Transfer aborted/error
     }
@@ -139,6 +137,7 @@ void main_vendor_bulk_out_received(udd_ep_status_t status,
                                    iram_size_t nb_transfered, udd_ep_id_t ep)
 {
     UNUSED(ep);
+    FPGA_releaselock();
     if (UDD_EP_TRANSFER_OK != status) {
         // Transfer aborted
 
@@ -187,9 +186,8 @@ bool openadc_setup_in_received(void)
         udd_g_ctrlreq.payload_size = ctrlmemread_size;
         ctrlmemread_size = 0;
 
-        if (FPGA_lockstatus() == fpga_ctrlmem){
-            FPGA_setlock(fpga_unlocked);
-        }
+        FPGA_releaselock();
+
 
         return true;
         break;
@@ -253,6 +251,7 @@ bool openadc_setup_out_received(void)
 
 void openadc_register_handlers(void)
 {
+    FPGA_releaselock();
     naeusb_add_in_handler(openadc_setup_in_received);
     naeusb_add_out_handler(openadc_setup_out_received);
 }
