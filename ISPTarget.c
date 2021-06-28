@@ -36,7 +36,7 @@
 
 #include "ISPTarget.h"
 
-#include "cw521.h"
+#include <asf.h>
 // frequencies for AVRISP mkII ISP programming
 uint32_t avrispmkIIfreqs[] = {
 	8000000, 4000000, 2000000, 1000000, 500000, 250000, 125000,

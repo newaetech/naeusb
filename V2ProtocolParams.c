@@ -38,7 +38,7 @@
 #define  INCLUDE_FROM_V2PROTOCOL_PARAMS_C
 #include "V2ProtocolParams.h"
 
-#include "cw521.h"
+#include <asf.h>
 /* Non-Volatile Parameter Values for EEPROM storage */
 //static uint8_t EEPROM_Reset_Polarity = 0x01;
 

@@ -38,7 +38,7 @@
 #include "V2Protocol.h"
 #include "XPROGTimeout.h"
 #include <string.h>
-#include "cw521.h"
+#include <asf.h>
 
 /** Current memory address for FLASH/EEPROM memory read/write commands */
 uint32_t CurrentAddress;

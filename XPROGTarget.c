@@ -43,7 +43,7 @@
 #include "ioport.h"
 #include "delay.h"
 
-#include "cw521.h"
+#include <asf.h>
 /** Flag to indicate if the USART is currently in Tx or Rx mode. */
 static bool IsSending;
 

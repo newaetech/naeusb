@@ -38,7 +38,7 @@
 #include <string.h>
 #include "XPROGTimeout.h"
 
-#include "cw521.h"
+#include <asf.h>
 /** Base absolute address for the target's NVM controller for PDI programming */
 uint32_t XPROG_Param_NVMBase       = 0x010001C0;
 
