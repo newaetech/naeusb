@@ -39,24 +39,21 @@ void openadc_progfpga_bulk(void){
 
 void openadc_readmem_bulk(void)
 {
-	uint32_t buflen = *(CTRLBUFFER_WORDPTR);	
-	uint32_t address = *(CTRLBUFFER_WORDPTR + 1);
-	
-	// Earlier, we locked the FPGA
-	// Relock it for our specific purpose
-	// This should never block
-	FPGA_releaselock();
-	while(!FPGA_setlock(fpga_blockin));
-	
-	/* Set address */
-	FPGA_setaddr(address);
-	
-	/* Do memory read */	
-	udi_vendor_bulk_in_run(
-	(uint8_t *) PSRAM_BASE_ADDRESS,
-	buflen,
-	main_vendor_bulk_in_received
-	);	
+    uint32_t buflen = *(CTRLBUFFER_WORDPTR);
+    uint32_t address = *(CTRLBUFFER_WORDPTR + 1);
+
+    FPGA_releaselock();
+    while(!FPGA_setlock(fpga_blockin));
+
+    FPGA_setaddr(address);
+    if  (!udi_vendor_bulk_in_run(
+        (uint8_t *) PSRAM_BASE_ADDRESS,
+        buflen,
+        main_vendor_bulk_in_received
+        )) {
+            //abort
+        }
+    FPGA_releaselock();
 }
 
 void openadc_writemem_bulk(void)
@@ -258,8 +255,4 @@ void openadc_register_handlers(void)
 {
     naeusb_add_in_handler(openadc_setup_in_received);
     naeusb_add_out_handler(openadc_setup_out_received);
-	udi_vendor_bulk_out_run(
-		main_buf_loopback,
-		sizeof(main_buf_loopback),
-		main_vendor_bulk_out_received);
 }
