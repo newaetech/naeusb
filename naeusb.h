@@ -4,10 +4,10 @@
 #define NAEUSB_MAX_HANDLERS 16
 #define CTRLBUFFER_WORDPTR ((uint32_t *) ((void *)ctrlbuffer))
 
-typedef (bool)(*usb_request_handle_func)(void);
+typedef bool (*usb_request_handle_func)(void);
 
-bool naeusb_add_in_handler(usb_requst_handle_func new_handler);
-bool naeusb_add_out_handler(usb_requst_handle_func new_handler);
+bool naeusb_add_in_handler(usb_request_handle_func new_handler);
+bool naeusb_add_out_handler(usb_request_handle_func new_handler);
 
 extern uint8_t ctrl_respbuf[64];
 
