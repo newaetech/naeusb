@@ -2,6 +2,7 @@
 #include "usart_driver.h"
 #include "V2Protocol.h"
 #include "conf_usb.h"
+#include "XPROGNewAE.h"
 static void ctrl_usart_cb(void)
 {
 	ctrl_usart(USART_TARGET, false);
@@ -52,6 +53,7 @@ bool usart_setup_out_received(void)
         udd_g_ctrlreq.callback = ctrl_avr_program_void;
         return true;
     }
+    return false;
 }
 
 bool usart_setup_in_received(void)
@@ -71,15 +73,15 @@ bool usart_setup_in_received(void)
         udd_g_ctrlreq.payload_size = cnt;
         return true;
         break;
-
-		case REQ_XMEGA_PROGRAM:
-			return XPROGProtocol_Command();
-			break;
-			
-		case REQ_AVR_PROGRAM:
-			return V2Protocol_ProcessCommand();
-			break;
+    case REQ_XMEGA_PROGRAM:
+        return XPROGProtocol_Command();
+        break;
+        
+    case REQ_AVR_PROGRAM:
+        return V2Protocol_ProcessCommand();
+        break;
     }
+    return false;
 }
 
 // naeusart because I wouldn't be surpised if usart_register_handlers collides with something

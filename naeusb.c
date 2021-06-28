@@ -1,4 +1,5 @@
 #include "naeusb.h"
+#include "ui.h"
 static usb_request_handle_func naeusb_in_request_handlers[NAEUSB_MAX_HANDLERS] = {NULL};
 static uint8_t naeusb_num_in_handlers = 0;
 

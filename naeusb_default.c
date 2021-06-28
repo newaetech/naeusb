@@ -1,5 +1,6 @@
 #include "naeusb_default.h"
 #include "usart_driver.h"
+#include <string.h>
 
 
 void naeusb_sam_cfg_out(void)
@@ -67,11 +68,15 @@ bool naeusb_fw_version_in(void)
 }
 
 static const char BUILD_DATE[] = __DATE__;
+static const char BUILD_TIME[] = __TIME__;
 bool naeusb_build_date_in(void)
 {
-    strncpy(respbuf, BUILD_DATE, 100);
+    strncpy(respbuf, BUILD_TIME, 64);
+    respbuf[sizeof(BUILD_TIME) - 1] = ' ';
+    strncpy(respbuf + sizeof(BUILD_TIME), BUILD_DATE, 64 - sizeof(BUILD_TIME));
     udd_g_ctrlreq.payload = respbuf;
     udd_g_ctrlreq.payload_size = strlen(respbuf);
+    return true;
 }
 
 volatile bool cdc_settings_change[UDI_CDC_PORT_NB] = {1};
