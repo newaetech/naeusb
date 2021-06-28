@@ -9,9 +9,16 @@
 #define REQ_FPGA_STATUS 0x15
 #define REQ_FPGA_PROGRAM 0x16
 
-#define REQ_XMEGA_PROGRAM 0x20
-#define REQ_AVR_PROGRAM 0x21
-
 #define REQ_FPGA_RESET 0x25
 
+typedef enum {
+    bep_emem=0,
+    bep_fpgabitstream=10
+} blockep_usage_t;
+
+extern blockep_usage_t blockendpoint_usage;
+
 void openadc_register_handlers(void);
+
+void main_vendor_bulk_in_received(udd_ep_status_t status,
+                                  iram_size_t nb_transfered, udd_ep_id_t ep);

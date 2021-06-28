@@ -1,5 +1,7 @@
 #include "naeusb_usart.h"
-#include "../usart_driver.h"
+#include "usart_driver.h"
+#include "V2Protocol.h"
+#include "conf_usb.h"
 static void ctrl_usart_cb(void)
 {
 	ctrl_usart(USART_TARGET, false);
@@ -15,6 +17,16 @@ static void ctrl_usart_cb_data(void)
 	for (int i = 0; i < udd_g_ctrlreq.req.wLength; i++){
 		usart_driver_putchar(USART_TARGET, NULL, udd_g_ctrlreq.payload[i]);
 	}
+}
+
+void ctrl_xmega_program_void(void)
+{
+	XPROGProtocol_Command();
+}
+
+void ctrl_avr_program_void(void)
+{
+	V2Protocol_ProcessCommand();
 }
 
 bool usart_setup_out_received(void)

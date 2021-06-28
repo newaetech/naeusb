@@ -11,6 +11,32 @@
 
 blockep_usage_t blockendpoint_usage = bep_emem;
 
+static uint8_t * ctrlmemread_buf;
+static unsigned int ctrlmemread_size;
+
+void ctrl_progfpga_bulk(void){
+
+    switch(udd_g_ctrlreq.req.wValue){
+    case 0xA0:
+        fpga_program_setup1();
+        break;
+
+    case 0xA1:
+        /* Waiting on data... */
+        fpga_program_setup2();
+        blockendpoint_usage = bep_fpgabitstream;
+        break;
+
+    case 0xA2:
+        /* Done */
+        blockendpoint_usage = bep_emem;
+        break;
+
+    default:
+        break;
+    }
+}
+
 void openadc_readmem_bulk(void)
 {
 	uint32_t buflen = *(CTRLBUFFER_WORDPTR);	

@@ -1,5 +1,6 @@
 #include "naeusb_default.h"
 
+
 void naeusb_sam_cfg_out(void)
 {
     switch(udd_g_ctrlreq.req.wValue & 0xFF)

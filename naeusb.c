@@ -5,10 +5,13 @@ static uint8_t naeusb_num_in_handlers = 0;
 static usb_request_handle_func naeusb_out_request_handlers[NAEUSB_MAX_HANDLERS] = {NULL};
 static uint8_t naeusb_num_out_handlers = 0;
 
+static volatile bool main_b_vendor_enable = true;
+static bool active = false;
+
+COMPILER_WORD_ALIGNED static uint8_t ctrlbuffer[64];
+
 COMPILER_WORD_ALIGNED
 uint8_t main_buf_loopback[MAIN_LOOPBACK_SIZE];
-
-uint8_t ctrl_respbuf[64];
 
 bool naeusb_add_in_handler(usb_requst_handle_func new_handler)
 {
