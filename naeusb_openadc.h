@@ -9,10 +9,9 @@
 #define REQ_FPGA_STATUS 0x15
 #define REQ_FPGA_PROGRAM 0x16
 
-#define REQ_USART0_DATA 0x1A
-#define REQ_USART0_CONFIG 0x1B
-
 #define REQ_XMEGA_PROGRAM 0x20
 #define REQ_AVR_PROGRAM 0x21
 
 #define REQ_FPGA_RESET 0x25
+
+void openadc_register_handlers(void);

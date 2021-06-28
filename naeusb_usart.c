@@ -29,3 +29,28 @@ bool usart_setup_out_received(void)
         return true;
     }
 }
+
+bool usart_setup_in_received(void)
+{
+    switch(udd_g_ctrlreq.req.bRequest) {
+    case REQ_USART0_CONFIG:
+        return ctrl_usart(USART_TARGET, true);
+        break;
+        
+    case REQ_USART0_DATA:						
+        for(cnt = 0; cnt < udd_g_ctrlreq.req.wLength; cnt++){
+            respbuf[cnt] = usart_driver_getchar(USART_TARGET);
+        }
+        udd_g_ctrlreq.payload = respbuf;
+        udd_g_ctrlreq.payload_size = cnt;
+        return true;
+        break;
+    }
+}
+
+// naeusart because I wouldn't be surpised if usart_register_handlers collides with something
+void naeusart_register_handlers(void)
+{
+    naeusb_add_in_handler(usart_setup_in_received);
+    naeusb_add_out_handler(usart_setup_out_received);
+}
