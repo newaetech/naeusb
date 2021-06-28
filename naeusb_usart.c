@@ -50,6 +50,8 @@ bool usart_setup_in_received(void)
         break;
         
     case REQ_USART0_DATA:						
+        0;
+        unsigned int cnt;
         for(cnt = 0; cnt < udd_g_ctrlreq.req.wLength; cnt++){
             respbuf[cnt] = usart_driver_getchar(USART_TARGET);
         }

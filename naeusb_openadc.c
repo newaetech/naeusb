@@ -14,7 +14,7 @@ blockep_usage_t blockendpoint_usage = bep_emem;
 static uint8_t * ctrlmemread_buf;
 static unsigned int ctrlmemread_size;
 
-void ctrl_progfpga_bulk(void){
+void openadc_progfpga_bulk(void){
 
     switch(udd_g_ctrlreq.req.wValue){
     case 0xA0:
@@ -129,8 +129,6 @@ void main_vendor_bulk_in_received(udd_ep_status_t status,
 {
     UNUSED(nb_transfered);
     UNUSED(ep);
-    if (stream_total_len != 0)
-        stream_total_len = 0;
     if (UDD_EP_TRANSFER_OK != status) {
         return; // Transfer aborted/error
     }
@@ -198,6 +196,8 @@ bool openadc_setup_in_received(void)
 
         return true;
         break;
+    }
+    return false;
 }
 bool openadc_setup_out_received(void)
 {
@@ -206,28 +206,21 @@ bool openadc_setup_out_received(void)
         /* Memory Read */
     case REQ_MEMREAD_BULK:
         if (FPGA_setlock(fpga_usblocked)){
-            udd_g_ctrlreq.callback = ctrl_readmem_bulk;
+            udd_g_ctrlreq.callback = openadc_readmem_bulk;
             return true;
         }
         break;
     case REQ_MEMREAD_CTRL:
         if (FPGA_setlock(fpga_usblocked)){
-            udd_g_ctrlreq.callback = ctrl_readmem_ctrl;
+            udd_g_ctrlreq.callback = openadc_readmem_ctrl;
             return true;
-        }
-        break;
-
-    case REQ_MEMSTREAM:
-        if (FPGA_setlock(fpga_usblocked)){
-                udd_g_ctrlreq.callback = ctrl_streammode;
-                return true;
         }
         break;
 
         /* Memory Write */
     case REQ_MEMWRITE_BULK:
         if (FPGA_setlock(fpga_usblocked)){
-            udd_g_ctrlreq.callback = ctrl_writemem_bulk;
+            udd_g_ctrlreq.callback = openadc_writemem_bulk;
             return true;
         }
         break;
@@ -235,10 +228,14 @@ bool openadc_setup_out_received(void)
 
     case REQ_MEMWRITE_CTRL:
         if (FPGA_setlock(fpga_usblocked)){
-            udd_g_ctrlreq.callback = ctrl_writemem_ctrl;
+            udd_g_ctrlreq.callback = openadc_writemem_ctrl;
             return true;
         }
         break;
+
+    case REQ_FPGA_PROGRAM:
+        udd_g_ctrlreq.callback = openadc_progfpga_bulk;
+        return true;
 
     default:
         return false;

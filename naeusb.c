@@ -8,12 +8,13 @@ static uint8_t naeusb_num_out_handlers = 0;
 static volatile bool main_b_vendor_enable = true;
 static bool active = false;
 
-COMPILER_WORD_ALIGNED static uint8_t ctrlbuffer[64];
+COMPILER_WORD_ALIGNED uint8_t ctrlbuffer[64];
+COMPILER_WORD_ALIGNED uint8_t respbuf[64];
 
 COMPILER_WORD_ALIGNED
 uint8_t main_buf_loopback[MAIN_LOOPBACK_SIZE];
 
-bool naeusb_add_in_handler(usb_requst_handle_func new_handler)
+bool naeusb_add_in_handler(usb_request_handle_func new_handler)
 {
     if (naeusb_num_in_handlers >= 16)
         return false;
@@ -22,7 +23,7 @@ bool naeusb_add_in_handler(usb_requst_handle_func new_handler)
     return true;
 }
 
-bool naeusb_add_out_handler(usb_requst_handle_func new_handler)
+bool naeusb_add_out_handler(usb_request_handle_func new_handler)
 {
     if (naeusb_num_out_handlers >= 16)
         return false;
@@ -56,13 +57,13 @@ bool main_vendor_enable(void)
     active = true;
     main_b_vendor_enable = true;
     // Start data reception on OUT endpoints
-#if UDI_VENDOR_EPS_SIZE_BULK_FS
-    //main_vendor_bulk_in_received(UDD_EP_TRANSFER_OK, 0, 0);
-    udi_vendor_bulk_out_run(
-        main_buf_loopback,
-        sizeof(main_buf_loopback),
-        main_vendor_bulk_out_received);
-#endif
+// #if UDI_VENDOR_EPS_SIZE_BULK_FS
+//     //main_vendor_bulk_in_received(UDD_EP_TRANSFER_OK, 0, 0);
+//     udi_vendor_bulk_out_run(
+//         main_buf_loopback,
+//         sizeof(main_buf_loopback),
+//         main_vendor_bulk_out_received);
+// #endif
     return true;
 }
 
@@ -74,8 +75,8 @@ void main_vendor_disable(void)
 bool main_setup_out_received(void)
 {
     bool handler_status = false;
-    udd_g_ctrlreq.payload = ctrl_respbuf;
-    udd_g_ctrlreq.payload_size = min(udd_g_ctrlreq.req.wLength,	sizeof(ctrl_respbuf));
+    udd_g_ctrlreq.payload = ctrlbuffer;
+    udd_g_ctrlreq.payload_size = min(udd_g_ctrlreq.req.wLength,	sizeof(ctrlbuffer));
 
     for (uint8_t i = naeusb_num_out_handlers; i > 0; i--) {
         handler_status = naeusb_out_request_handlers[i-1]();

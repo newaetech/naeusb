@@ -1,4 +1,5 @@
 #include "naeusb_default.h"
+#include "usart_driver.h"
 
 
 void naeusb_sam_cfg_out(void)
@@ -91,7 +92,7 @@ void naeusb_cdc_settings_out(void)
 bool naeusb_cdc_settings_in(void)
 {
     for (uint8_t i = 0; i < UDI_CDC_PORT_NB; i++) {
-        respbuf[i] = cdc_settings_change[i]:
+        respbuf[i] = cdc_settings_change[i];
     }
     udd_g_ctrlreq.payload = respbuf;
     udd_g_ctrlreq.payload_size = UDI_CDC_PORT_NB;
