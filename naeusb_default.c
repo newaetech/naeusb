@@ -3,6 +3,7 @@
 #include <string.h>
 
 
+
 void naeusb_sam_cfg_out(void)
 {
     switch(udd_g_ctrlreq.req.wValue & 0xFF)
@@ -32,7 +33,8 @@ void naeusb_sam_cfg_out(void)
 
         /* With knowledge that I will rise again, I lay down my life. */
         while (RSTC->RSTC_SR & RSTC_SR_SRCMP);
-        RSTC->RSTC_CR |= RSTC_CR_KEY(0xA5) | RSTC_CR_PERRST | RSTC_CR_PROCRST;
+        //RSTC->RSTC_CR |= RSTC_CR_KEY(0xA5) | RSTC_CR_PERRST | RSTC_CR_PROCRST;
+		RSTC->RSTC_CR |= RSTC_CR_KEY_PASSWD | RSTC_CR_PERRST | RSTC_CR_PROCRST;
         while(1);
         break;
         /* Disconnect USB (will kill stuff) */
@@ -42,12 +44,14 @@ void naeusb_sam_cfg_out(void)
     case SAM_RESET:
         udc_detach();
         while (RSTC->RSTC_SR & RSTC_SR_SRCMP);
-        RSTC->RSTC_CR |= RSTC_CR_KEY(0xA5) | RSTC_CR_PERRST | RSTC_CR_PROCRST;
+        RSTC->RSTC_CR |= RSTC_CR_KEY_PASSWD | RSTC_CR_PERRST | RSTC_CR_PROCRST;
         while(1);
         break;
         
     case SAM_RELEASE_LOCK: // use in case of pipe error emergency
+	#if USB_DEVICE_PRODUCT_ID != 0xACE0
         FPGA_releaselock();
+	#endif
         break;
 
         /* Oh well, sucks to be you */

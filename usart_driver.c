@@ -195,13 +195,16 @@ bool ctrl_usart(Usart * usart, bool directionIn)
 							init_circ_buf(&tx1buf);
 							init_circ_buf(&rx1buf);
 							usart_x_enabled[1] = true;
-						} else if (usart == USART2)
+						} 
+#ifdef USART2
+						else if (usart == USART2)
 						{
 							sysclk_enable_peripheral_clock(ID_USART2);
 							init_circ_buf(&tx2buf);
 							init_circ_buf(&rx2buf);
 							usart_x_enabled[2] = true;
 						}
+#endif
 #ifdef USART3
 						else if (usart == USART3)
 						{
@@ -232,10 +235,13 @@ bool ctrl_usart(Usart * usart, bool directionIn)
 				} else if (usart == USART1) {
 					usart1_enableIO();
 					irq_register_handler(USART1_IRQn, 5);
-				} else if (usart == USART2) {
+				}
+				#ifdef USART2
+				 else if (usart == USART2) {
 					usart2_enableIO();
 					irq_register_handler(USART2_IRQn, 5);
 				}
+				#endif
 #ifdef USART3
 				else if (usart == USART3) {
 					usart3_enableIO();
@@ -265,9 +271,12 @@ bool ctrl_usart(Usart * usart, bool directionIn)
 						cnt = circ_buf_count(&rx0buf);
 					} else if (usart == USART1){
 						cnt = circ_buf_count(&rx1buf);
-					} else if (usart == USART2){
+					} 
+					#ifdef USART3
+					else if (usart == USART2){
 						cnt = circ_buf_count(&rx2buf);
 					}
+					#endif
 #ifdef USART3
 					else if (usart == USART3){
 						cnt = circ_buf_count(&rx3buf);
@@ -291,9 +300,12 @@ bool ctrl_usart(Usart * usart, bool directionIn)
 						cnt = circ_buf_count(&tx0buf);
 					} else if (usart == USART1){
 						cnt = circ_buf_count(&tx1buf);
-					} else if (usart == USART2){
+					}
+					#ifdef USART2
+					 else if (usart == USART2){
 						cnt = circ_buf_count(&tx2buf);
 					}
+					#endif
 #ifdef USART3
 					else if (usart == USART3){
 						cnt = circ_buf_count(&tx3buf);
@@ -316,7 +328,9 @@ void usart_driver_putchar(Usart * usart, tcirc_buf * txbuf, uint8_t data)
 	if (txbuf == NULL){
 		if (usart == USART0) txbuf = &tx0buf;
 		else if (usart == USART1) txbuf = &tx1buf;
+		#ifdef USART2
 		else if (usart == USART2) txbuf = &tx2buf;
+		#endif
 #ifdef USART3
 		else if (usart == USART3) txbuf = &tx3buf;
 #endif
@@ -342,7 +356,9 @@ uint8_t usart_driver_getchar(Usart * usart)
 	if (rxbuf == NULL){
 			if (usart == USART0) rxbuf = &rx0buf;
 			else if (usart == USART1) rxbuf = &rx1buf;
+			#ifdef USART2
 			else if (usart == USART2) rxbuf = &rx2buf;
+			#endif
 #ifdef USART3
 			else if (usart == USART3) rxbuf = &rx3buf;
 #endif
@@ -386,11 +402,13 @@ ISR(USART1_Handler)
 	generic_isr(USART1, &rx1buf, &tx1buf);
 }
 
+#ifdef USART2
 #ifndef USART2_SPIDUMP
 ISR(USART2_Handler)
 {
 	generic_isr(USART2, &rx2buf, &tx2buf);
 }
+#endif
 #endif
 
 #ifdef USART3

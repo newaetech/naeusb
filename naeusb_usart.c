@@ -1,8 +1,11 @@
 #include "naeusb_usart.h"
 #include "usart_driver.h"
+#if USB_DEVICE_PRODUCT_ID != 0xACE0
 #include "V2Protocol.h"
-#include "conf_usb.h"
 #include "XPROGNewAE.h"
+#endif
+#include "conf_usb.h"
+
 static void ctrl_usart_cb(void)
 {
 	ctrl_usart(USART_TARGET, false);
@@ -19,7 +22,7 @@ static void ctrl_usart_cb_data(void)
 		usart_driver_putchar(USART_TARGET, NULL, udd_g_ctrlreq.payload[i]);
 	}
 }
-
+#if USB_DEVICE_PRODUCT_ID != 0xACE0
 void ctrl_xmega_program_void(void)
 {
 	XPROGProtocol_Command();
@@ -29,7 +32,7 @@ void ctrl_avr_program_void(void)
 {
 	V2Protocol_ProcessCommand();
 }
-
+#endif
 bool usart_setup_out_received(void)
 {
     switch(udd_g_ctrlreq.req.bRequest) {
@@ -40,6 +43,7 @@ bool usart_setup_out_received(void)
     case REQ_USART0_DATA:
         udd_g_ctrlreq.callback = ctrl_usart_cb_data;
         return true;
+#if USB_DEVICE_PRODUCT_ID != 0xACE0
     case REQ_XMEGA_PROGRAM:
         /*
         udd_g_ctrlreq.payload = xmegabuffer;
@@ -52,6 +56,7 @@ bool usart_setup_out_received(void)
     case REQ_AVR_PROGRAM:
         udd_g_ctrlreq.callback = ctrl_avr_program_void;
         return true;
+#endif
     }
     return false;
 }
@@ -73,6 +78,8 @@ bool usart_setup_in_received(void)
         udd_g_ctrlreq.payload_size = cnt;
         return true;
         break;
+		
+	#if USB_DEVICE_PRODUCT_ID != 0xACE0
     case REQ_XMEGA_PROGRAM:
         return XPROGProtocol_Command();
         break;
@@ -80,6 +87,7 @@ bool usart_setup_in_received(void)
     case REQ_AVR_PROGRAM:
         return V2Protocol_ProcessCommand();
         break;
+	#endif
     }
     return false;
 }
