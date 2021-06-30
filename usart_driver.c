@@ -75,7 +75,13 @@ static inline void usart0_enableIO(void)
 	gpio_configure_pin(PIN_USART0_TXD, PIN_USART0_TXD_FLAGS);
 }
 
-#define usart1_enableIO() do{;}while(0)
+static inline void usart1_enableIO(void)
+{
+	gpio_configure_pin(PIN_USART1_RXD, PIN_USART1_RXD_FLAGS);
+	gpio_configure_pin(PIN_USART1_TXD, PIN_USART1_TXD_FLAGS);
+}
+
+//#define usart1_enableIO() do{;}while(0)
 #define usart2_enableIO() do{;}while(0)
 	
 #ifdef USART3
