@@ -59,6 +59,56 @@ typedef struct {
     uint8_t cdc_settings_change:1;
 } usart_driver;
 
+#ifdef CW_USE_USART0
+usart_driver usart0_driver = {
+    .usart = USART0,
+    .usart_id = 0,
+    .cdc_supported = 1,
+    .cdc_settings_change = 1,
+
+};
+ISR(USART0_Handler)
+{
+	generic_isr(USART0, &rx0buf, &tx0buf);
+}
+#else
+#endif
+
+#ifdef CW_USE_USART1
+usart_driver usart1_driver = {
+    .usart = USART1,
+    .usart_id = 0,
+    .cdc_supported = 1,
+    .cdc_settings_change = 1,
+
+};
+ISR(USART1_Handler)
+{
+	generic_isr(USART1, &rx1buf, &tx1buf);
+}
+#else
+#endif
+
+#ifdef CW_USE_USART2
+#ifndef USART2
+#error "USART2 unavailable"
+#endif
+usart_driver usart2_driver;
+ISR(USART2_Handler)
+{
+	generic_isr(USART2, &rx1buf, &tx1buf);
+}
+#else
+#endif
+
+#ifdef CW_USE_USART3
+#ifndef USART3
+#error "USART3 unavailable"
+#endif
+usart_driver usart3_driver;
+#else
+#endif
+
 void usart_dummy_func(void)
 {
 
@@ -105,40 +155,188 @@ void generic_isr(usart_driver *driver)
 	}
 }
 
-#ifdef CW_USE_USART0
-usart_driver usart0_driver;
-ISR(USART0_Handler)
+bool ctrl_naeusart_in(void)
 {
-	generic_isr(USART0, &rx0buf, &tx0buf);
-}
-#else
-#endif
+    usart_driver *driver = get_usart_from_id(udd_g_ctrlreq.req.wValue >> 8);
+    uint32_t cnt;
 
-#ifdef CW_USE_USART1
-usart_driver usart1_driver;
-ISR(USART1_Handler)
+    if (!driver) return false;
+
+    switch (udd_g_ctrlreq.req.wValue & 0xFF) {
+    case USART_WVREQ_INIT:
+        return true;
+        
+    case USART_WVREQ_NUMWAIT:
+        if (udd_g_ctrlreq.req.wLength < 4) {
+            return false;
+        }
+
+        udd_g_ctrlreq.payload = respbuf;
+        udd_g_ctrlreq.payload_size = 4;
+        cnt = circ_buf_count(&driver->rxbuf);
+        word2buf(respbuf, cnt);
+        return true;
+    
+    case USART_WVREQ_NUMWAIT_TX:
+        if (udd_g_ctrlreq.req.wLength < 4) {
+            return false;
+        }
+        udd_g_ctrlreq.payload = respbuf;
+        udd_g_ctrlreq.payload_size = 4;
+        cnt = circ_buf_count(&driver->txbuf);
+        word2buf(respbuf, cnt);
+        return true;
+
+    }
+
+    return false;
+}
+
+bool configure_usart(usart_driver *driver, uint32_t baud, uint8_t stop_bits, uint8_t parity, uint8_t dbits)
 {
-	generic_isr(USART1, &rx1buf, &tx1buf);
-}
-#else
-#endif
+    driver->usartopts.baud = baud;
+    switch(stop_bits)
+        {
+        case 0:
+            driver->usartopts.stop_bits = US_MR_NBSTOP_1_BIT;
+            break;
+        case 1:
+            driver->usartopts.stop_bits = US_MR_NBSTOP_1_5_BIT;
+            break;
+        case 2:
+            driver->usartopts.stop_bits = US_MR_NBSTOP_2_BIT;
+            break;
+        default:
+            driver->usartopts.stop_bits = US_MR_NBSTOP_1_BIT;
+        }
 
-#ifdef CW_USE_USART2
-#ifndef USART2
-#error "USART2 unavailable"
-#endif
-usart_driver usart2_driver;
-ISR(USART2_Handler)
+    /* Parity */
+    switch(parity)
+        {
+        case 0:
+            driver->usartopts.parity_type = US_MR_PAR_NO;
+            break;
+        case 1:
+            driver->usartopts.parity_type = US_MR_PAR_ODD;
+            break;
+        case 2:
+            driver->usartopts.parity_type = US_MR_PAR_EVEN;
+            break;
+        case 3:
+            driver->usartopts.parity_type = US_MR_PAR_MARK;
+            break;
+        case 4:
+            driver->usartopts.parity_type = US_MR_PAR_SPACE;
+            break;							
+        default:
+            driver->usartopts.parity_type = US_MR_PAR_NO;
+        }
+
+    /* Data Bits */
+    switch(dbits)
+        {
+        case 5:
+            driver->usartopts.char_length = US_MR_CHRL_5_BIT;
+            break;
+        case 6:
+            driver->usartopts.char_length = US_MR_CHRL_6_BIT;
+            break;
+        case 7:
+            driver->usartopts.char_length = US_MR_CHRL_7_BIT;
+            break;					
+        case 8:							
+        default:
+            driver->usartopts.char_length = US_MR_CHRL_8_BIT;
+        }
+        
+    driver->usartopts.channel_mode = US_MR_CHMODE_NORMAL;
+    usart_enableIO(driver);
+    driver->enabled = 1;
+    init_circ_buf(&driver->txbuf);
+    init_circ_buf(&driver->rxbuf);
+    init_circ_buf(&driver->rx_cdc_buf);
+
+    usart_init_rs232(driver->usart, &driver->usartopts, sysclk_get_cpu_hz());
+    
+}
+
+void ctrl_naeusbusart_out(void)
 {
-	generic_isr(USART2, &rx1buf, &tx1buf);
-}
-#else
-#endif
+    usart_driver *driver = get_usart_from_id(udd_g_ctrlreq.req.wValue >> 8);
+    if (!driver) return false;
 
-#ifdef CW_USE_USART3
-#ifndef USART3
-#error "USART3 unavailable"
-#endif
-usart_driver usart3_driver;
-#else
-#endif
+    uint32_t baud;
+
+    switch (udd_g_ctrlreq.req.wValue & 0xFF) {
+    case USART_WVREQ_INIT:
+        if (udd_g_ctrlreq.req.wLength != 7) return false;
+
+        buf2word(baud, udd_g_ctrlreq.payload);
+        configure_usart(driver, baud, udd_g_ctrlreq.payload[4], 
+        udd_g_ctrlreq.payload[5], udd_g_ctrlreq.payload[6]);
+
+        return true;
+
+    case USART_RVREQ_ENABLE:
+        usart_enable_rx(driver->usart);
+        usart_enable_tx(driver->usart);
+
+        usart_enable_interupt(usart, UART_IER_RXRDY);
+        usart_enableIO(driver);
+
+    case USART_WVREQ_DISABLE:
+        usart_disable_rx(driver->usart);
+        usart_disable_tx(driver->usart);
+        usart_disable_interrupt(driver->usart, UART_IER_RXRDY | USART_IER_TXRDY);
+        return true;
+    }
+
+}
+
+void usart_driver_putchar(usart_driver *driver, uint8_t data)
+{
+
+    add_to_circ_buf(&driver->txbuf, data, false);
+
+	// Send the first byte if nothing is yet being sent
+	// This is determined by seeing if the TX complete interrupt is
+	// enabled.
+	if ((usart_get_interrupt_mask(driver->usart) & US_CSR_TXRDY) == 0) {
+		if ((usart_get_status(driver->usart) & US_CSR_TXRDY))
+			usart_putchar(driver->usart, get_from_circ_buf(txbuf));
+		usart_enable_interrupt(driver->usart, US_CSR_TXRDY);
+	}
+}
+
+uint8_t usart_driver_getchar(usart_driver *driver)
+{
+    return get_from_circ_buf(&driver->rxbuf);
+}
+
+usart_driver *get_usart_from_id(int id) {
+    #ifdef CW_USE_USART0
+        if (id == 0) return &usart0_driver;
+    #endif
+    #ifdef CW_USE_USART1
+        if (id == 1) return &usart1_driver;
+    #endif
+
+    return NULL;
+}
+
+
+// naeusart because I wouldn't be surpised if usart_register_handlers collides with something
+void naeusart_register_handlers(void)
+{
+    naeusb_add_in_handler(usart_setup_in_received);
+    naeusb_add_out_handler(usart_setup_out_received);
+}
+
+//////CDC FUNC
+
+void naeusb_cdc_settings_out(void)
+{
+    for (uint8_t i = 0; i < UDI_CDC_PORT_NB; i++) {
+
+    }
+}
