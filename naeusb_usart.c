@@ -55,7 +55,7 @@ bool usart_setup_out_received(void);
 bool naeusb_cdc_settings_in(void);
 void naeusb_cdc_settings_out(void);
 
-
+void generic_isr(usart_driver *driver);
 
 
 #ifdef CW_USE_USART0
