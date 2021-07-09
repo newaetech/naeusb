@@ -213,9 +213,7 @@ bool ctrl_usart_in(void)
         word2buf(respbuf, cnt);
         return true;
 
-    case REQ_CDC_SETTINGS_EN:
-        return naeusb_cdc_settings_in();
-        break;
+
 
     }
 
@@ -322,10 +320,7 @@ void ctrl_usart_out(void)
         usart_disable_interrupt(driver->usart, UART_IER_RXRDY | UART_IER_TXRDY);
         return true;
 
-    case REQ_CDC_SETTINGS_EN:
-        udd_g_ctrlreq.callback = naeusb_cdc_settings_out;
-        return true;
-        break;
+
     }
 
 }
@@ -407,10 +402,24 @@ void naeusart_register_handlers(void)
 
 //////CDC FUNC
 
+usart_driver *get_nth_available_driver(uint8_t port)
+{
+	usart_driver *driver;
+	for (uint8_t i = 0; i < 4; i++) {
+		driver = get_usart_from_id(i);
+		if (!driver)
+		continue;
+		if (port == 0) break;
+		port--;
+	}
+	if (port != 0) return NULL;
+	return driver;
+}
+
 void naeusb_cdc_settings_out(void)
 {
     for (uint8_t i = 0; i < 4; i++) {
-        usart_driver *driver = get_usart_from_id(i);
+        usart_driver *driver = get_nth_available_driver(i);
         if (driver) {
             if (udd_g_ctrlreq.req.wValue & (1 << i)) {
                 driver->cdc_settings_change = 1;
@@ -424,7 +433,8 @@ void naeusb_cdc_settings_out(void)
 bool naeusb_cdc_settings_in(void)
 {
     for (uint8_t i = 0; i < 4; i++) {
-        usart_driver *driver = get_usart_from_id(i);
+        usart_driver *driver = get_nth_available_driver(i);
+		respbuf[i] = 0;
         if (driver)
             respbuf[i] = driver->cdc_settings_change;
     }
@@ -436,15 +446,7 @@ bool naeusb_cdc_settings_in(void)
 
 bool cdc_enable(uint8_t port)
 {
-	usart_driver *driver;
-	for (uint8_t i = 0; i < 4; i++) {
-		driver = get_usart_from_id(port);
-		if (!driver)
-		continue;
-		if (port == 0) break;
-		port--;
-	}
-	if (port != 0) return;
+	usart_driver *driver = get_nth_available_driver(port);
 	
     driver->cdc_enabled = 1;
     return true;
@@ -452,15 +454,7 @@ bool cdc_enable(uint8_t port)
 
 void cdc_disable(uint8_t port)
 {
-	usart_driver *driver;
-	for (uint8_t i = 0; i < 4; i++) {
-		driver = get_usart_from_id(port);
-		if (!driver)
-		continue;
-		if (port == 0) break;
-		port--;
-	}
-	if (port != 0) return;
+	usart_driver *driver = get_nth_available_driver(port);
 
     driver->cdc_enabled = 0;
 }
@@ -468,15 +462,7 @@ void cdc_disable(uint8_t port)
 uint8_t uart_buf[512] = {0};
 void my_callback_rx_notify(uint8_t port)
 {
-	usart_driver *driver;
-	for (uint8_t i = 0; i < 4; i++) {
-		driver = get_usart_from_id(port);
-		if (!driver)
-		continue;
-		if (port == 0) break;
-		port--;
-	}
-	if (port != 0) return;
+	usart_driver *driver = get_nth_available_driver(port);
     
     if (driver->cdc_enabled && driver->enabled) {
         iram_size_t num_char = udi_cdc_multi_get_nb_received_data(port);
@@ -493,15 +479,7 @@ void my_callback_rx_notify(uint8_t port)
 
 void my_callback_config(uint8_t port, usb_cdc_line_coding_t * cfg)
 {
-	usart_driver *driver;
-	for (uint8_t i = 0; i < 4; i++) {
-		driver = get_usart_from_id(port);
-		if (!driver)
-		continue;
-		if (port == 0) break;
-		port--;
-	}
-	if (port != 0) return;
+	usart_driver *driver = get_nth_available_driver(port);
 
     if (driver->cdc_enabled && driver->enabled) {
         uint32_t baud = cfg->dwDTERate;
@@ -557,6 +535,10 @@ bool usart_setup_out_received(void)
         udd_g_ctrlreq.callback = ctrl_avr_program_void;
         return true;
 #endif
+    case REQ_CDC_SETTINGS_EN:
+        udd_g_ctrlreq.callback = naeusb_cdc_settings_out;
+        return true;
+        break;
     }
     return false;
 }
@@ -590,6 +572,10 @@ bool usart_setup_in_received(void)
         return V2Protocol_ProcessCommand();
         break;
 	#endif
+	
+	case REQ_CDC_SETTINGS_EN:
+        return naeusb_cdc_settings_in();
+        break;
     }
     return false;
 }
