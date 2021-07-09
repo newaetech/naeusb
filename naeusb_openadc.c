@@ -187,8 +187,6 @@ bool openadc_setup_in_received(void)
         ctrlmemread_size = 0;
 
         FPGA_releaselock();
-
-
         return true;
         break;
 
