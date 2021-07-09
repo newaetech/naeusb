@@ -20,7 +20,6 @@
 
     // bool naeusb_build_date_in(void);
 
-#define REQ_CDC_SETTINGS_EN 0x31
 
     // void naeusb_cdc_settings_out(void);
     // bool naeusb_cdc_settings_in(void);

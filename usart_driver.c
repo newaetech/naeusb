@@ -75,6 +75,7 @@ static inline void usart0_enableIO(void)
 	gpio_configure_pin(PIN_USART0_TXD, PIN_USART0_TXD_FLAGS);
 }
 
+
 static inline void usart1_enableIO(void)
 {
 	gpio_configure_pin(PIN_USART1_RXD, PIN_USART1_RXD_FLAGS);
