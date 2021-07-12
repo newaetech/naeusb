@@ -72,6 +72,7 @@
 #define FPGA_INITB_LOW()		gpio_set_pin_low(PIN_FPGA_INITB_GPIO)
 #define FPGA_INITB_HIGH()		gpio_set_pin_high(PIN_FPGA_INITB_GPIO)
 #define FPGA_INITB_SETUP()		gpio_configure_pin(PIN_FPGA_INITB_GPIO, PIN_FPGA_INITB_FLAGS)
+#define FPGA_INITB_STATUS()		gpio_pin_is_high(PIN_FPGA_INITB_GPIO)
 
 #define PIN_FPGA_DONE_FLAGS     (PIO_TYPE_PIO_INPUT | PIO_DEFAULT)
 #define	FPGA_ISDONE()			gpio_pin_is_high(PIN_FPGA_DONE_GPIO)
@@ -81,7 +82,6 @@
 #endif
 
 #if FPGA_USE_BITBANG
-#error "Bit-Bang mode might be broken currently"
 
 #define PIN_FPGA_CCLK_FLAGS		(PIO_TYPE_PIO_OUTPUT_0 | PIO_DEFAULT)
 #define FPGA_CCLK_LOW()			gpio_set_pin_low(PIN_FPGA_CCLK_GPIO)
