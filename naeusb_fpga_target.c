@@ -2,6 +2,7 @@
 #include "naeusb_fpga_target.h"
 #include "fpgautil_io.h"
 #include "fpga_program.h"
+#include "naeusb_default.h"
 
 #define USB_STATUS_NONE       0
 #define USB_STATUS_PARAMWRONG 1
@@ -191,10 +192,12 @@ static void ctrl_progfpgaspi(void){
 	}
 }
 
+#ifdef CW_PROG_XMEGA
 void ctrl_xmega_program_void(void)
 {
     XPROGProtocol_Command();
 }
+#endif
 
 void ctrl_writemem_ctrl(void){
     uint32_t buflen = *(CTRLBUFFER_WORDPTR);
@@ -478,10 +481,11 @@ bool fpga_target_setup_in_received(void)
             udd_g_ctrlreq.payload_size = 4;
             return true;
             break;
-
+#ifdef CW_PROG_XMEGA
         case REQ_XMEGA_PROGRAM:
             return XPROGProtocol_Command();
             break;
+#endif
 
         case REQ_CDCE906:
             respbuf[0] = cdce906_status;
@@ -526,10 +530,53 @@ bool fpga_target_setup_in_received(void)
 
 }
 
+
+		
+void fpga_target_sam_cfg_out(void)
+{
+	switch (udd_g_ctrlreq.req.wValue & 0xFF) {
+	    case 0x04:
+	    gpio_configure_pin(PIN_PCK0, PIO_OUTPUT_0);
+	    break;
+
+	    /* Turn on FPGA Clock */
+	    case 0x05:
+	    gpio_configure_pin(PIN_PCK0, PIN_PCK0_FLAGS);
+	    break;
+
+	    /* Toggle trigger pin */
+	    case 0x06:
+	    gpio_set_pin_high(FPGA_TRIGGER_GPIO);
+	    delay_cycles(250);
+	    gpio_set_pin_low(FPGA_TRIGGER_GPIO);
+	    break;
+	        
+	    /* Turn target power off */
+	    case 0x07:
+	    kill_fpga_power();
+	    break;
+	        
+	    /* Turn target power on */
+	    case 0x08:
+	    enable_fpga_power();
+	    break;
+	}
+}
+
 bool fpga_target_setup_out_received(void)
 {
     blockendpoint_usage = bep_emem;
     switch(udd_g_ctrlreq.req.bRequest){
+		case REQ_SAM_CFG:
+			0;
+			uint16_t wVal = udd_g_ctrlreq.req.wValue & 0xFF;
+			if ((wVal > 0x03) && (wVal < 0x10)) {
+				udd_g_ctrlreq.callback = fpga_target_sam_cfg_out;
+				return true;
+			} else {
+				return false;
+			}
+			break;
         /* Memory Read */
         case REQ_MEMREAD_BULK:
             udd_g_ctrlreq.callback = ctrl_readmem_bulk;
@@ -557,6 +604,7 @@ bool fpga_target_setup_out_received(void)
             return true;
 
             /* XMEGA Programming */
+#ifdef CW_PROG_XMEGA
         case REQ_XMEGA_PROGRAM:
             /*
                udd_g_ctrlreq.payload = xmegabuffer;
@@ -564,6 +612,7 @@ bool fpga_target_setup_out_received(void)
                */
             udd_g_ctrlreq.callback = ctrl_xmega_program_void;
             return true;
+#endif
 
         case REQ_CDCE906:
             udd_g_ctrlreq.callback = ctrl_cdce906_cb;
