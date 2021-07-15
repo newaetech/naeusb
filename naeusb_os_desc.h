@@ -52,7 +52,7 @@ struct MS_DEV_GUID_NAME {
 };
 
 #define MAKE_DEV_GUID_NAME \
-(struct MS_DEV_GUID_NAME) {.data = {\
+{.data = {\
 	'D', 0x00, 'e', 0x00, 'v', 0x00, 'i', 0x00, 'c', 0x00, 'e', 0x00,\
 	'I', 0x00, 'n', 0x00, 't', 0x00, 'e', 0x00, 'r', 0x00, 'f', 0x00, 'a', 0x00, 'c', 0x00, 'e', 0x00,\
 	'G', 0x00, 'U', 0x00, 'I', 0x00, 'D', 0x00, 0x00, 0x00,\
@@ -109,6 +109,7 @@ struct MS_COMP_ID_FEAT_DESC {
 }
 
 
+#if USB_DEVICE_NB_INTERFACE > 1
 struct MS_FUNC_SUBSET_HEADER {
     uint8_t wLength[2];
     uint8_t wDescriptorType[2];
@@ -127,6 +128,16 @@ struct MS_FUNC_SUBSET_HEADER {
 .wSubsetLength=U162ARR(sizeof(struct MS_FUNC_SUBSET_HEADER)), \
 .FEAT=MAKE_FEAT_DESC \
 }
+#else
+struct MS_FUNC_SUBSET_HEADER {
+    struct MS_COMP_ID_FEAT_DESC FEAT;
+};
+
+#define MAKE_FUNC_SUBSET_HEADER \
+{ \
+.FEAT=MAKE_FEAT_DESC \
+}
+#endif
 
 struct MS_OS_DESC_SET_HEADER {
     uint8_t wLength[2];
