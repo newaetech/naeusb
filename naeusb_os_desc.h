@@ -14,18 +14,17 @@ struct MS_DEV_INT_GUID {
 
 #define MAKE_DEV_INT_GUID(INTERFACE_NUM) \
 {.data = {'{', 0x00, \
-USB_DEVICE_VENDOR_ID & 0xFF, 0x00, USB_DEVICE_VENDOR_ID >> 8, 0x00, \
-USB_DEVICE_PRODUCT_ID & 0xFF, 0x00, USB_DEVICE_PRODUCT_ID >> 8, 0x00, \
-INTERFACE_NUM, 0x00, INTERFACE_NUM, 0x00, 'A', 0x00, 'C', 0x00, 'E', 0x00, \
-USB_DEVICE_VENDOR_ID & 0xFF, 0x00, USB_DEVICE_VENDOR_ID >> 8, 0x00, \
-USB_DEVICE_PRODUCT_ID & 0xFF, 0x00, USB_DEVICE_PRODUCT_ID >> 8, 0x00, \
-INTERFACE_NUM, 0x00, INTERFACE_NUM, 0x00, 'A', 0x00, 'C', 0x00, 'E', 0x00, \
-USB_DEVICE_VENDOR_ID & 0xFF, 0x00, USB_DEVICE_VENDOR_ID >> 8, 0x00, \
-USB_DEVICE_PRODUCT_ID & 0xFF, 0x00, USB_DEVICE_PRODUCT_ID >> 8, 0x00, \
-INTERFACE_NUM, 0x00, INTERFACE_NUM, 0x00, 'A', 0x00, 'C', 0x00, 'E', 0x00, \
-USB_DEVICE_VENDOR_ID & 0xFF, 0x00, USB_DEVICE_VENDOR_ID >> 8, 0x00, \
-USB_DEVICE_PRODUCT_ID & 0xFF, 0x00, USB_DEVICE_PRODUCT_ID >> 8, 0x00, \
-INTERFACE_NUM, 0x00, INTERFACE_NUM, 0x00, 'A', 0x00, 'C', 0x00, 'E', 0x00, \
+INTERFACE_NUM+'0', 0x00, 'A', 0x00, 'C', 0x00, 'E', 0x00, \
+'2', 0x00, 'B', 0x00, '3', 0x00, 'E', 0x00, \
+'-', 0x00, \
+'2', 0x00, 'B', 0x00, '3', 0x00, 'E', 0x00, \
+'-', 0x00, \
+'2', 0x00, 'B', 0x00, '3', 0x00, 'E', 0x00, \
+'-', 0x00, \
+((USB_DEVICE_PRODUCT_ID >> 12 ) & 0x07) + '0', 0x00, ((USB_DEVICE_PRODUCT_ID >> 8 ) & 0x07) + '0', 0x00, \
+((USB_DEVICE_PRODUCT_ID >> 4 ) & 0x07) + '0', 0x00, ((USB_DEVICE_PRODUCT_ID >> 0 ) & 0x07) + '0', 0x00, \
+INTERFACE_NUM + '0', 0x00, 'A', 0x00, 'C', 0x00, 'E', 0x00, \
+'2', 0x00, 'B', 0x00, '3', 0x00, 'E', 0x00, \
 '}', 0x00, 0x00, 0x00 \
 }}
 
@@ -88,8 +87,6 @@ struct MS_REG_PROP_DESC_GUID {
 .PropertyData = MAKE_DEV_INT_GUID(0), \
 MAKE_NULL_TERM \
 }
-
-uint16_t sz = sizeof(struct MS_REG_PROP_DESC_GUID);
 
 struct MS_COMP_ID_FEAT_DESC {
     uint8_t wLength[2];
@@ -182,7 +179,7 @@ struct MS_BOS_DESCRIPTOR {
 { \
 .bLength = 0x05,\
 .bRequestType = 0x0F, \
-.wTotalLen = U162ARR(0x21), \
+.wTotalLen = U162ARR(sizeof(struct MS_BOS_DESCRIPTOR)), \
 .bNumPlatDesc = 0x01, \
 .bDescLen = 0x1C, \
 .bDescType = 0x10, \
