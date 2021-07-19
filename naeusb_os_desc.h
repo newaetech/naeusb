@@ -1,7 +1,5 @@
 #pragma once
 
-#pragma pack(push, 1)
-
 #define U162ARR(U16) {(U16) & 0xFF, (U16) >> 8}
 
 struct MS_DEV_INT_GUID {
@@ -194,5 +192,3 @@ struct MS_BOS_DESCRIPTOR {
 }
 
 static struct MS_BOS_DESCRIPTOR MS_BOS_PACKET = MAKE_BOS_DESC;
-
-#pragma pack(pop)
