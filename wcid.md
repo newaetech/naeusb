@@ -113,8 +113,10 @@ struct MS_OS_DESC_SET_HEADER {
 
 ### Function Subset Header
 
-If a device has multiple interfaces, this header has the following
-format:
+This header is used to indicate which interface to apply the following
+feature information. If our device has multiple interfaces,
+we can use this header to specify which interface is our custom vendor
+interface (aka which interface the WINUSB driver should be used for):
 
 ```C
 struct MS_FUNC_SUBSET_HEADER {
@@ -137,7 +139,9 @@ struct MS_FUNC_SUBSET_HEADER {
 
 ### Feature Description
 
-The feature description has the following format:
+In our case, the feature description is used to
+specify that WINUSB should be used. This is done
+by setting the CompatibleID field to "WINUSB":
 
 ```C
 struct MS_COMP_ID_FEAT_DESC {
@@ -250,3 +254,6 @@ The easiest way to do this is via [Zadig](https://zadig.akeo.ie/),
 which can force devices to use WinUSB, libusbK, or libusb0. Once this is
 done for a single device, these other drivers should become 
 available for any devices that request them.
+
+See the [libwdi WCID Devices page](https://github.com/pbatard/libwdi/wiki/WCID-Devices) for
+more information.
