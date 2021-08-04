@@ -15,6 +15,11 @@ COMPILER_WORD_ALIGNED uint8_t respbuf[64];
 COMPILER_WORD_ALIGNED
 uint8_t main_buf_loopback[MAIN_LOOPBACK_SIZE];
 
+bool usb_is_enabled(void)
+{
+    return main_b_vendor_enable;
+}
+
 bool naeusb_add_in_handler(usb_request_handle_func new_handler)
 {
     if (naeusb_num_in_handlers >= 16)
