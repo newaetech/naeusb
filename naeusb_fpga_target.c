@@ -530,8 +530,14 @@ bool fpga_target_setup_in_received(void)
 
 }
 
+#ifndef kill_fpga_power
+#define kill_fpga_power()
+#endif
 
-		
+#ifndef enable_fpga_power
+#define enable_fpga_power()
+#endif
+
 void fpga_target_sam_cfg_out(void)
 {
 	switch (udd_g_ctrlreq.req.wValue & 0xFF) {
