@@ -63,6 +63,7 @@ void generic_isr(usart_driver *driver);
 
 
 #ifdef CW_USE_USART0
+// #error CWUSEUSART0
 usart_driver usart0_driver = {
     .usart = USART0,
     .usart_id = 0,
@@ -133,9 +134,25 @@ void usart2_enableIO(void)
 
 #ifdef CW_USE_USART3
 #ifndef USART3
-#error "USART3 unavailable"
 #endif
-usart_driver usart3_driver;
+usart_driver usart3_driver = {
+    .usart = USART3,
+    .usart_id = 3,
+    .cdc_supported = 1,
+    .cdc_settings_change = 1,
+
+};
+ISR(USART3_Handler)
+{
+	generic_isr(&usart3_driver);
+}
+void usart3_enableIO(void)
+{
+	sysclk_enable_peripheral_clock(ID_USART3);
+	gpio_configure_pin(PIN_USART3_RXD, PIN_USART3_RXD_FLAGS);
+	gpio_configure_pin(PIN_USART3_TXD, PIN_USART3_TXD_FLAGS);
+	irq_register_handler(USART3_IRQn, 5);
+}
 #else
 void usart3_enableIO(void)
 {
@@ -306,6 +323,7 @@ void ctrl_usart_out(void)
         if (udd_g_ctrlreq.req.wLength != 7) return false;
 
         buf2word(baud, udd_g_ctrlreq.payload);
+		usart_enableIO(driver);
         configure_usart(driver, baud, udd_g_ctrlreq.payload[4], 
         udd_g_ctrlreq.payload[5], udd_g_ctrlreq.payload[6]);
 
@@ -358,6 +376,12 @@ usart_driver *get_usart_from_id(int id)
     #endif
     #ifdef CW_USE_USART1
         if (id == 1) return &usart1_driver;
+    #endif
+    #ifdef CW_USE_USART2
+        if (id == 2) return &usart2_driver;
+    #endif
+    #ifdef CW_USE_USART3
+        if (id == 3) return &usart3_driver;
     #endif
 
     return NULL;
