@@ -87,6 +87,9 @@ struct MS_BOS_DESCRIPTOR {
 };
 ```
 
+we'll only be using `uint8_t` fields here to avoid endianness and
+struct padding issues.
+
 ##  MS OS Descriptor Set
 
 Once the OS has requested and received the MS_BOS_DESCRIPTOR, the OS will request
@@ -227,9 +230,9 @@ from above would suffice, so long as an additional null terminator
 (`{0x00, 0x00}`) is added at the end.
 
 **NOTE:** The WCID Devices page says `MS_DEV_INT_GUID` should have
-more than one GUID if the device has more than one interface; however,
-this does not appear to be the case in practice, as ChipWhisperer
-only sets a single GUID without issue.
+more than one GUID if the device has more than one interface and libusb
+does report the GUID as malformed. However, it does still work with a single GUID,
+whereas if you don't use "DeviceInterfaceGUIDs", it won't work at all.
 
 ## ChipWhisperer Example
 
@@ -240,6 +243,35 @@ and the MS OS Descriptor, as well as macros to generate them, in `naeusb_os_desc
 A custom `udc.c` file which ensures the BCD USB is set to 2.1,
 and implements the BOS and MS OS Descriptor responses is also included
 in the repo.
+
+## Troubleshooting
+
+Unfortunately, there's a lot that can go wrong here and you don't get a lot of
+feedback when things do go wrong. [usbtreeview](https://www.uwe-sieber.de/usbtreeview_e.html) is
+a great utility for working with USB on Windows, as Device Manager gives you very little information.
+
+If you mess up any of the descriptor structs above (wrong values, wrong lengths, missing descriptors)
+Windows will likely tell you that your descriptor is wrong.
+
+### LIBUSB_ERROR_NOT_FOUND
+
+If you try to open your USB device, or try to access something that requires your device to be open, like
+a serial number, and you get this error, the most common cause is that your GUID is malformed. Unfortunately,
+libusb doesn't seem to pick this up (even though it will pick up if you only supply one GUID on
+a device with multiple interfaces), so you're on your own to check this.
+
+Common ways that your GUID can be malformed include not being the right length/format, or using
+lower case letters instead of upper case letters.
+
+Another symptom of this issue that you can see if you set `LIBUSB_DEBUG=4`, you won't see a driver being set 
+for your device. The driver being set looks as follows:
+
+```
+[482.429517] [000049d8] libusb: debug [get_api_type] driver(s): WINUSB
+[482.429647] [000049d8] libusb: debug [get_api_type] matched driver name against WinUSB
+[482.429755] [000049d8] libusb: debug [winusb_get_device_list] setting composite interface for [91]:
+[482.429853] [000049d8] libusb: debug [set_composite_interface] interface[0] = \\?\USB#VID_2B3E&PID_ACE2&MI_00#7&2413F3D9&0&0000#{CAF5AA1C-A69A-4995-ABC2-2AE57A51ADE9}
+```
 
 ## Miscellaneous
 
