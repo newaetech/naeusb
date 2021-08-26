@@ -60,7 +60,7 @@ void ISPProtocol_EnterISPMode(void)
 	} Enter_ISP_Params;
 
 	if (udd_g_ctrlreq.payload_size != 11){
-		printf("Payload size = %d, error!?\n", udd_g_ctrlreq.payload_size);
+		//printf("Payload size = %d, error!?\n", udd_g_ctrlreq.payload_size);
 		return;
 	}
 
@@ -104,7 +104,7 @@ void ISPProtocol_EnterISPMode(void)
 		}
 	}
 
-	printf("AVRPROG: Enter ISP Mode: %x\n", ResponseStatus);
+	//printf("AVRPROG: Enter ISP Mode: %x\n", ResponseStatus); //printf crashes on husky. It's been undef'd, but just in case
 	avrisp_status_payload[0] = CMD_ENTER_PROGMODE_ISP;
 	avrisp_status_payload[1] = ResponseStatus;
 	avrisp_status_payload_size = 2;
@@ -120,7 +120,7 @@ void ISPProtocol_LeaveISPMode(void)
 	} Leave_ISP_Params;
 
 	if (udd_g_ctrlreq.payload_size != 2){
-		printf("Payload size = %d, error!?\n", udd_g_ctrlreq.payload_size);
+		//printf("Payload size = %d, error!?\n", udd_g_ctrlreq.payload_size);
 		return;
 	}
 
@@ -155,7 +155,7 @@ void ISPProtocol_ProgramMemory(uint8_t V2Command, uint8_t * buffer)
 	} Write_Memory_Params; 
 
 	if (udd_g_ctrlreq.payload_size != 9){
-		printf("Payload size = %d, error!?\n", udd_g_ctrlreq.payload_size);
+		//printf("Payload size = %d, error!?\n", udd_g_ctrlreq.payload_size);
 		return;
 	}
 
@@ -265,7 +265,7 @@ void ISPProtocol_ProgramMemory(uint8_t V2Command, uint8_t * buffer)
 		  MustLoadExtendedAddress = true;
 	}
 
-	//printf("AVRPROG: Programming Done: %x\n", ProgrammingStatus);
+	////printf("AVRPROG: Programming Done: %x\n", ProgrammingStatus);
 	avrisp_status_payload[0] = V2Command;
 	avrisp_status_payload[1] = ProgrammingStatus;
 	avrisp_status_payload_size = 2;
@@ -286,7 +286,7 @@ void ISPProtocol_ReadMemory(uint8_t V2Command, uint8_t * buffer)
 	} Read_Memory_Params;
 	
 	if (udd_g_ctrlreq.payload_size != 3){
-		printf("AVRPROG: Payload size = %d, error!?\n", udd_g_ctrlreq.payload_size);
+		//printf("AVRPROG: Payload size = %d, error!?\n", udd_g_ctrlreq.payload_size);
 		return;
 	}
 
@@ -297,7 +297,7 @@ void ISPProtocol_ReadMemory(uint8_t V2Command, uint8_t * buffer)
 	avrisp_status_payload[1] = STATUS_CMD_FAILED;
 	avrisp_status_payload_size = 2;
 		
-	//printf("AVRPROG: Attempting to read %d bytes\n", Read_Memory_Params.BytesToRead);
+	////printf("AVRPROG: Attempting to read %d bytes\n", Read_Memory_Params.BytesToRead);
 
 	//Woops... too long
 	if (Read_Memory_Params.BytesToRead > 256)
@@ -339,7 +339,7 @@ void ISPProtocol_ReadMemory(uint8_t V2Command, uint8_t * buffer)
 		}
 	}
 
-	//printf("AVRPROG: Read %d bytes\n", Read_Memory_Params.BytesToRead);
+	////printf("AVRPROG: Read %d bytes\n", Read_Memory_Params.BytesToRead);
 	avrisp_status_payload[1] = STATUS_CMD_OK;
 	avrisp_status_payload_size = 2;
 }
@@ -355,7 +355,7 @@ void ISPProtocol_ChipErase(void)
 	} Erase_Chip_Params;	
 	
 	if (udd_g_ctrlreq.payload_size != sizeof(Erase_Chip_Params)){
-		printf("AVRPROG: Erase: Payload size = %d, error!?\n", udd_g_ctrlreq.payload_size);
+		//printf("AVRPROG: Erase: Payload size = %d, error!?\n", udd_g_ctrlreq.payload_size);
 		return;
 	}
 
@@ -366,7 +366,7 @@ void ISPProtocol_ChipErase(void)
 	/* Send the chip erase commands as given by the host to the device */
 	for (uint8_t SByte = 0; SByte < sizeof(Erase_Chip_Params.EraseCommandBytes); SByte++) {
 	  ISPTarget_SendByte(Erase_Chip_Params.EraseCommandBytes[SByte]);
-	  //printf("Sending %02x", Erase_Chip_Params.EraseCommandBytes[SByte]);
+	  ////printf("Sending %02x", Erase_Chip_Params.EraseCommandBytes[SByte]);
 	}
 
 	/* Use appropriate command completion check as given by the host (delay or busy polling) */
@@ -375,7 +375,7 @@ void ISPProtocol_ChipErase(void)
 	else
 	  ResponseStatus = ISPTarget_WaitWhileTargetBusy();
 
-	//printf("AVRPROG: Chip Erase: %x\n", ResponseStatus);
+	////printf("AVRPROG: Chip Erase: %x\n", ResponseStatus);
 
 	avrisp_status_payload[0] = CMD_CHIP_ERASE_ISP;
 	avrisp_status_payload[1] = ResponseStatus;
@@ -396,7 +396,7 @@ void ISPProtocol_ReadFuseLockSigOSCCAL(uint8_t V2Command)
 	} Read_FuseLockSigOSCCAL_Params;
 
 	if (udd_g_ctrlreq.payload_size != 5){
-		printf("Payload size = %d, error!?\n", udd_g_ctrlreq.payload_size);
+		//printf("Payload size = %d, error!?\n", udd_g_ctrlreq.payload_size);
 		return;
 	}
 
@@ -429,7 +429,7 @@ void ISPProtocol_WriteFuseLock(uint8_t V2Command)
 	} Write_FuseLockSig_Params;
 	
 	if (udd_g_ctrlreq.payload_size != sizeof(Write_FuseLockSig_Params)){
-		printf("Payload size = %d, error!?\n", udd_g_ctrlreq.payload_size);
+		//printf("Payload size = %d, error!?\n", udd_g_ctrlreq.payload_size);
 		return;
 	}
 

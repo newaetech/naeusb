@@ -241,7 +241,7 @@ static void V2Protocol_LoadAddress(void)
 	if (CurrentAddress & (1UL << 31))
 	  MustLoadExtendedAddress = true;
 	  
-	printf("AVRPROG: Address = %02x\n", (unsigned int)CurrentAddress);
+	// printf("AVRPROG: Address = %02x\n", (unsigned int)CurrentAddress);
 
 	avrisp_status_payload[1] = STATUS_CMD_OK;
 	avrisp_status_payload_size = 2;
