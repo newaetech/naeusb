@@ -30,11 +30,11 @@ void fpga_program_init(void)
 /* FPGA Programming Step 1: Erase FPGA, setup SPI interface */
 void fpga_program_setup1(void)
 {
-	
-#if (USB_DEVICE_PRODUCT_ID == 0xACE5) || (USB_DEVICE_PRODUCT_ID == 0xC610)
-    /* Init - set program low to erase FPGA */
-    FPGA_NPROG_LOW();
+	/* Init - set program low to erase FPGA */
+	FPGA_NPROG_LOW();
 
+#if (USB_DEVICE_PRODUCT_ID == 0xACE5) || (USB_DEVICE_PRODUCT_ID == 0xC610) || (USB_DEVICE_PRODUCT_ID == 0xC310)
+    
     usart_spi_opt_t spiopts;
     spiopts.baudrate = 10000000UL;
     spiopts.char_length = US_MR_CHRL_8_BIT;
@@ -57,15 +57,16 @@ void fpga_program_setup1(void)
 
 	#elif FPGA_USE_USART
 	usart_spi_opt_t spiopts;
-	spiopts.baudrate = 10000000UL;
+	spiopts.baudrate = 20000000UL;
 	spiopts.char_length = US_MR_CHRL_8_BIT;
 	spiopts.channel_mode = US_MR_CHMODE_NORMAL;
 	spiopts.spi_mode = SPI_MODE_0;
-
 	sysclk_enable_peripheral_clock(FPGA_PROG_USART_ID);
 	usart_init_spi_master(FPGA_PROG_USART, &spiopts, sysclk_get_cpu_hz());
+
 	gpio_configure_pin(PIN_FPGA_CCLK_GPIO, PIN_FPGA_CCLK_USART_FLAGS);
 	gpio_configure_pin(PIN_FPGA_DO_GPIO, PIN_FPGA_DO_USART_FLAGS);
+	
 	usart_enable_tx(FPGA_PROG_USART);
 	#else
 

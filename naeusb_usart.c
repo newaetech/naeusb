@@ -78,8 +78,10 @@ ISR(USART0_Handler)
 void usart0_enableIO(void)
 {
 	sysclk_enable_peripheral_clock(ID_USART0);
+	#if USB_DEVICE_PRODUCT_ID != 0xC310
 	gpio_configure_pin(PIN_USART0_RXD, PIN_USART0_RXD_FLAGS);
 	gpio_configure_pin(PIN_USART0_TXD, PIN_USART0_TXD_FLAGS);
+	#endif
 	irq_register_handler(USART0_IRQn, 5);
 }
 #else
@@ -105,8 +107,11 @@ ISR(USART1_Handler)
 void usart1_enableIO(void)
 {
 	sysclk_enable_peripheral_clock(ID_USART1);
+	
+	#if USB_DEVICE_PRODUCT_ID != 0xC310
 	gpio_configure_pin(PIN_USART1_RXD_IDX, PIN_USART1_RXD_FLAGS);
 	gpio_configure_pin(PIN_USART1_TXD_IDX, PIN_USART1_TXD_FLAGS);
+	#endif
 	irq_register_handler(USART1_IRQn, 5);
 }
 #else
@@ -516,7 +521,7 @@ void my_callback_config(uint8_t port, usb_cdc_line_coding_t * cfg)
 {
 	usart_driver *driver = get_nth_available_driver(port);
 
-    if (driver->cdc_enabled && driver->enabled) {
+    if (driver->cdc_enabled) {
         uint32_t baud = cfg->dwDTERate;
 
         uint8_t stop_bits = ((uint32_t)cfg->bCharFormat) << 12;
@@ -541,8 +546,17 @@ void my_callback_config(uint8_t port, usb_cdc_line_coding_t * cfg)
             default:
             return;
         }
+		
+
 
         configure_usart(driver, baud, stop_bits, parity_type, dbits);
+		if (!(usart_get_interrupt_mask(driver) & UART_IER_RXRDY)) {
+			usart_enable_rx(driver->usart);
+			usart_enable_tx(driver->usart);
+
+			usart_enable_interrupt(driver->usart, UART_IER_RXRDY);
+		}
+		
     }
 }
 
