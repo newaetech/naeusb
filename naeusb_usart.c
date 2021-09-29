@@ -82,7 +82,7 @@ void usart0_enableIO(void)
 	gpio_configure_pin(PIN_USART0_RXD, PIN_USART0_RXD_FLAGS);
 	gpio_configure_pin(PIN_USART0_TXD, PIN_USART0_TXD_FLAGS);
 	#endif
-	irq_register_handler(USART0_IRQn, 5);
+	irq_register_handler(USART0_IRQn, 3);
 }
 #else
 void usart0_enableIO(void)
@@ -112,7 +112,7 @@ void usart1_enableIO(void)
 	gpio_configure_pin(PIN_USART1_RXD_IDX, PIN_USART1_RXD_FLAGS);
 	gpio_configure_pin(PIN_USART1_TXD_IDX, PIN_USART1_TXD_FLAGS);
 	#endif
-	irq_register_handler(USART1_IRQn, 5);
+	irq_register_handler(USART1_IRQn, 3);
 }
 #else
 void usart1_enableIO(void)
@@ -156,7 +156,7 @@ void usart3_enableIO(void)
 	sysclk_enable_peripheral_clock(ID_USART3);
 	gpio_configure_pin(PIN_USART3_RXD, PIN_USART3_RXD_FLAGS);
 	gpio_configure_pin(PIN_USART3_TXD, PIN_USART3_TXD_FLAGS);
-	irq_register_handler(USART3_IRQn, 5);
+	irq_register_handler(USART3_IRQn, 3);
 }
 #else
 void usart3_enableIO(void)
