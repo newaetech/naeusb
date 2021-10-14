@@ -479,7 +479,7 @@ bool naeusb_cdc_settings_in(void)
             respbuf[i] = driver->cdc_settings_change;
     }
     udd_g_ctrlreq.payload = respbuf;
-    udd_g_ctrlreq.payload_size = 4;
+    udd_g_ctrlreq.payload_size = min(4, udd_g_ctrlreq.req.wLength);
     return true;
 
 }
