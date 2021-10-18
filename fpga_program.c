@@ -22,6 +22,21 @@
 
 void fpga_program_spi_setup1(uint32_t prog_freq)
 {
+	#if AVRISP_USEUART
+	usart_spi_opt_t spiopts;
+	spiopts.baudrate = prog_freq;
+	spiopts.char_length = US_MR_CHRL_8_BIT;
+	spiopts.channel_mode = US_MR_CHMODE_NORMAL;
+	spiopts.spi_mode = SPI_MODE_0;
+	
+	sysclk_enable_peripheral_clock(AVRISP_USART_ID);
+	usart_init_spi_master(AVRISP_USART, &spiopts, sysclk_get_cpu_hz());
+	gpio_configure_pin(AVRISP_MISO_GPIO, AVRISP_MISO_FLAGS);
+	gpio_configure_pin(AVRISP_MOSI_GPIO, AVRISP_MOSI_FLAGS);
+	gpio_configure_pin(AVRISP_SCK_GPIO, AVRISP_SCK_FLAGS);
+	usart_enable_tx(AVRISP_USART);
+	usart_enable_rx(AVRISP_USART);
+	#else
 	spi_enable_clock(SPI);
 	spi_reset(SPI);
 	spi_set_master_mode(SPI);
@@ -36,12 +51,17 @@ void fpga_program_spi_setup1(uint32_t prog_freq)
 
 	gpio_configure_pin(SPI_MOSI_GPIO, SPI_MOSI_FLAGS);
 	gpio_configure_pin(SPI_SPCK_GPIO, SPI_SPCK_FLAGS);
+	#endif
 
 }
 
 void fpga_program_spi_sendbyte(uint8_t databyte)
 {
+	#if AVRISP_USEUART
+	usart_putchar(AVRISP_USART, databyte);
+	#else
 	spi_write(SPI, databyte, 0, 0);
+	#endif
 }
 
 /* FPGA Programming: Init pins, set to standby state */
