@@ -101,6 +101,10 @@
 #define FPGA_DO_SETUP()			gpio_configure_pin(PIN_FPGA_DO_GPIO, PIN_FPGA_DO_FLAGS)
 
 extern uint8_t USB_PWR_STATE;
+void fpga_program_spi_setup1(uint32_t);
+void fpga_program_spi_sendbyte(uint8_t databyte);
+
+
 /**
  * \brief Send a byte to FPGA using CCLK/DO, FPGA must be in programming mode
  *
@@ -116,7 +120,7 @@ void fpga_program_init(void);
 /**
  * \brief Setup peripherals, erase FPGA, must be followed by call to _setup2()
  */
-void fpga_program_setup1(void);
+void fpga_program_setup1(uint32_t);
 
 /**
  * \brief Set NPROG to idle state in preperation for programming to commence

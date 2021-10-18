@@ -15,10 +15,14 @@ static uint8_t * ctrlmemread_buf;
 static unsigned int ctrlmemread_size;
 
 void openadc_progfpga_bulk(void){
-
+	uint32_t prog_freq = 1E6;
     switch(udd_g_ctrlreq.req.wValue){
     case 0xA0:
-        fpga_program_setup1();
+        
+        if (udd_g_ctrlreq.req.wLength == 4) {
+            prog_freq = *(CTRLBUFFER_WORDPTR);
+        }
+        fpga_program_setup1(prog_freq);
         break;
 
     case 0xA1:
@@ -32,6 +36,21 @@ void openadc_progfpga_bulk(void){
         blockendpoint_usage = bep_emem;
         break;
 
+    case 0xB0:
+        if (udd_g_ctrlreq.req.wLength == 4) {
+            prog_freq = *(CTRLBUFFER_WORDPTR);
+        }
+        fpga_program_spi_setup1(prog_freq);
+        break;
+
+    case 0xB1:
+        blockendpoint_usage = bep_fpgabitstreamspi;
+        break;
+    
+    case 0xB2:
+        /* Done */
+        blockendpoint_usage = bep_emem;
+        break;
     default:
         break;
     }
@@ -168,6 +187,10 @@ void main_vendor_bulk_out_received(udd_ep_status_t status,
 #if FPGA_USE_BITBANG
         FPGA_CCLK_LOW();
 #endif
+    } else if (blockendpoint_usage == bep_fpgabitstreamspi) {
+        for(unsigned int i = 0; i < nb_transfered; i++){
+            fpga_program_spi_sendbyte(main_buf_loopback[i]);
+        }
     }
 
     //printf("BULKOUT: %d bytes\n", (int)nb_transfered);

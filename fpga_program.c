@@ -20,6 +20,30 @@
 #include "fpga_program.h"
 #include "spi.h"
 
+void fpga_program_spi_setup1(uint32_t prog_freq)
+{
+	spi_enable_clock(SPI);
+	spi_reset(SPI);
+	spi_set_master_mode(SPI);
+	spi_disable_mode_fault_detect(SPI);
+	spi_disable_loopback(SPI);
+
+	spi_set_clock_polarity(SPI, 0, 0);
+	spi_set_clock_phase(SPI, 0, 1);
+	spi_set_baudrate_div(SPI, 0, spi_calc_baudrate_div(prog_freq, sysclk_get_cpu_hz()));
+
+	spi_enable(SPI);
+
+	gpio_configure_pin(SPI_MOSI_GPIO, SPI_MOSI_FLAGS);
+	gpio_configure_pin(SPI_SPCK_GPIO, SPI_SPCK_FLAGS);
+
+}
+
+void fpga_program_spi_sendbyte(uint8_t databyte)
+{
+	spi_write(SPI, databyte, 0, 0);
+}
+
 /* FPGA Programming: Init pins, set to standby state */
 void fpga_program_init(void)
 {
@@ -28,7 +52,7 @@ void fpga_program_init(void)
 }
 
 /* FPGA Programming Step 1: Erase FPGA, setup SPI interface */
-void fpga_program_setup1(void)
+void fpga_program_setup1(uint32_t prog_freq)
 {
 	/* Init - set program low to erase FPGA */
 	FPGA_NPROG_LOW();
@@ -36,7 +60,7 @@ void fpga_program_setup1(void)
 #if (USB_DEVICE_PRODUCT_ID == 0xACE5) || (USB_DEVICE_PRODUCT_ID == 0xC610) || (USB_DEVICE_PRODUCT_ID == 0xC310)
     
     usart_spi_opt_t spiopts;
-    spiopts.baudrate = 10000000UL;
+    spiopts.baudrate = prog_freq;
     spiopts.char_length = US_MR_CHRL_8_BIT;
     spiopts.channel_mode = US_MR_CHMODE_NORMAL;
     spiopts.spi_mode = SPI_MODE_0;
@@ -57,7 +81,7 @@ void fpga_program_setup1(void)
 
 	#elif FPGA_USE_USART
 	usart_spi_opt_t spiopts;
-	spiopts.baudrate = 20000000UL;
+	spiopts.baudrate = prog_freq;
 	spiopts.char_length = US_MR_CHRL_8_BIT;
 	spiopts.channel_mode = US_MR_CHMODE_NORMAL;
 	spiopts.spi_mode = SPI_MODE_0;
@@ -78,7 +102,7 @@ void fpga_program_setup1(void)
 
 	spi_set_clock_polarity(SPI, 0, 0);
 	spi_set_clock_phase(SPI, 0, 1);
-	spi_set_baudrate_div(SPI, 0, spi_calc_baudrate_div(1000000, sysclk_get_cpu_hz()));
+	spi_set_baudrate_div(SPI, 0, spi_calc_baudrate_div(prog_freq, sysclk_get_cpu_hz()));
 
 	spi_enable(SPI);
 

@@ -14,7 +14,8 @@
 
 typedef enum {
     bep_emem=0,
-    bep_fpgabitstream=10
+    bep_fpgabitstream=10,
+    bep_fpgabitstreamspi=20
 } blockep_usage_t;
 
 extern blockep_usage_t blockendpoint_usage;
