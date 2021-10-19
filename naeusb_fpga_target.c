@@ -247,10 +247,13 @@ void main_vendor_bulk_in_received(udd_ep_status_t status,
 }
 
 void ctrl_progfpga_bulk(void){
-
+    uint32_t prog_freq = 1E6;
     switch(udd_g_ctrlreq.req.wValue){
         case 0xA0:
-            fpga_program_setup1();			
+            if (udd_g_ctrlreq.req.wLength == 4) {
+                prog_freq = *(CTRLBUFFER_WORDPTR);
+            }
+            fpga_program_setup1(prog_freq);			
             break;
 
         case 0xA1:
