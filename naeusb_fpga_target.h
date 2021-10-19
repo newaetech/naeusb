@@ -36,7 +36,7 @@ typedef enum {
 
 extern blockep_usage_t blockendpoint_usage;
 
-void openadc_register_handlers(void);
+void fpga_target_register_handlers(void);
 
 void main_vendor_bulk_in_received(udd_ep_status_t status,
                                   iram_size_t nb_transfered, udd_ep_id_t ep);
