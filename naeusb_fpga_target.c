@@ -36,6 +36,8 @@ static uint8_t cdce906_data;
 
 uint32_t sam3u_mem[256];
 
+uint32_t bulk_fpga_write_addr = 0;
+
 void main_vendor_bulk_out_received(udd_ep_status_t status,
         iram_size_t nb_transfered, udd_ep_id_t ep);
 bool fpga_target_setup_in_received(void);
@@ -224,6 +226,7 @@ void ctrl_writemem_bulk(void){
     //uint32_t address = *(CTRLBUFFER_WORDPTR + 1);
 
     FPGA_setlock(fpga_blockout);
+    bulk_fpga_write_addr = *(CTRLBUFFER_WORDPTR + 1);
 
     /* Set address */
     //Not required - this is done automatically via the XMEM interface
@@ -290,7 +293,7 @@ void main_vendor_bulk_out_received(udd_ep_status_t status,
 
     if (blockendpoint_usage == bep_emem){
         for(unsigned int i = 0; i < nb_transfered; i++){
-            xram[i] = main_buf_loopback[i];
+            xram[i+bulk_fpga_write_addr] = main_buf_loopback[i];
         }
 
         if (FPGA_lockstatus() == fpga_blockout){
