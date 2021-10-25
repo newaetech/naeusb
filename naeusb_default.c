@@ -2,9 +2,12 @@
 #include "usart_driver.h"
 #include <string.h>
 
+
 #ifndef RSTC_CR_KEY_PASSWD
 #define RSTC_CR_KEY_PASSWD RSTC_CR_KEY(0xA5)
 #endif
+
+extern void switch_configurations(void);
 
 void naeusb_sam_cfg_out(void)
 {
@@ -57,6 +60,12 @@ void naeusb_sam_cfg_out(void)
         break;
 
         /* Oh well, sucks to be you */
+    case 0x42:
+        udc_stop();
+        switch_configurations();
+        udc_start();
+        break;
+
     default:
         break;
     }
