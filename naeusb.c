@@ -22,20 +22,22 @@ bool usb_is_enabled(void)
 
 bool naeusb_add_in_handler(usb_request_handle_func new_handler)
 {
-    if (naeusb_num_in_handlers >= 16)
-        return false;
+    if (naeusb_num_in_handlers < 16) {
+        naeusb_in_request_handlers[naeusb_num_in_handlers++] = new_handler;
+        return true;
+    }
+    return false;
     
-    naeusb_in_request_handlers[naeusb_num_in_handlers++] = new_handler;
-    return true;
 }
 
 bool naeusb_add_out_handler(usb_request_handle_func new_handler)
 {
-    if (naeusb_num_out_handlers >= 16)
-        return false;
+    if (naeusb_num_out_handlers < 16) {
+        naeusb_out_request_handlers[naeusb_num_out_handlers++] = new_handler;
+        return true;
+    }
+    return false;
     
-    naeusb_out_request_handlers[naeusb_num_out_handlers++] = new_handler;
-    return true;
 }
 
 //this stuff just turns leds on and off
