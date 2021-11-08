@@ -8,8 +8,13 @@
 
 typedef bool (*usb_request_handle_func)(void);
 
+typedef bool (*usb_bulk_handle_func)(udd_ep_status_t, iram_size_t, udd_ep_id_t);
+
 bool naeusb_add_in_handler(usb_request_handle_func new_handler);
 bool naeusb_add_out_handler(usb_request_handle_func new_handler);
+
+// NOTE: bulk in handler doesn't make any sense
+bool naeusb_add_bulk_out_handler(usb_bulk_handle_func);
 
 extern COMPILER_WORD_ALIGNED uint8_t ctrlbuffer[64];
 extern COMPILER_WORD_ALIGNED uint8_t respbuf[64];
