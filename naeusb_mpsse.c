@@ -1,5 +1,7 @@
 #include "naeusb_default.h"
 
+#define uint8_t unsigned char
+
 // static uint16_t MPSSE_TX_IDX = 0;
 static uint8_t MPSSE_CUR_CMD = 0; // the current MPSSE command
 static uint16_t MPSSE_TX_IDX = 0; // the current TX buffer index
@@ -13,20 +15,36 @@ static uint8_t MPSSE_LOOPBACK_ENABLED = 0; // connect TDI to TDO for loopback
 //should be fine since  it looks like openocd just keeps retrying transaction until it works
 static uint8_t MPSSE_TRANSACTION_LOCK = 1;  //Currently sending data back to the PC
 
+static uint32_t NUM_PROCESSED_CMDS = 0;
+static uint8_t MPSSE_TX_REQ = 0;
 
-COMPILER_WORD_ALIGNED volatile uint8_t MPSSE_RX_BUFFER[0x4000] __attribute__ ((__section__(".mpssemem")));
-COMPILER_WORD_ALIGNED volatile uint8_t MPSSE_TX_BUFFER[512] = {0};
+
+COMPILER_WORD_ALIGNED volatile uint8_t MPSSE_RX_BUFFER[64] __attribute__ ((__section__(".mpssemem")));
+COMPILER_WORD_ALIGNED volatile uint8_t MPSSE_TX_BUFFER[64] __attribute__ ((__section__(".mpssemem"))) = {0};
+COMPILER_WORD_ALIGNED volatile uint8_t MPSSE_TX_BUFFER_BAK[64] __attribute__ ((__section__(".mpssemem"))) = {0};
+
 void mpsse_vendor_bulk_in_received(udd_ep_status_t status,
                                   iram_size_t nb_transfered, udd_ep_id_t ep);
 void mpsse_vendor_bulk_out_received(udd_ep_status_t status,
                                   iram_size_t nb_transfered, udd_ep_id_t ep);
 
+#define BITMODE_MPSSE 0x02
+
+#define SIO_RESET_REQUEST             0x00
+#define SIO_SET_LATENCY_TIMER_REQUEST 0x09
+#define SIO_GET_LATENCY_TIMER_REQUEST 0x0A
+#define SIO_SET_BITMODE_REQUEST       0x0B
+
+#define SIO_RESET_SIO 0
+#define SIO_RESET_PURGE_RX 1
+#define SIO_RESET_PURGE_TX 2
 extern void switch_configurations(void);
-// need to implement reset
-// latency timer request
-// purge tx and TX on reset
-// set bitmode - just selects MPSSE mode
-// I think we can just ignore all this stuff, since they're just to setup 
+
+static int16_t mpsse_tx_buffer_remaining(void)
+{
+    return MPSSE_TX_BYTES - MPSSE_TX_IDX;
+}
+
 bool mpsse_setup_out_received(void)
 {
     // don't handle 
@@ -40,19 +58,17 @@ bool mpsse_setup_out_received(void)
     if (udd_g_ctrlreq.req.wIndex != 0x01) {
         return false;
     }
+    if ((udd_g_ctrlreq.req.bRequest == SIO_RESET_REQUEST)) {
+        // TODO: cancel old run if one setup
+        udd_ep_abort(UDI_MPSSE_EP_BULK_OUT);
+        udd_ep_abort(UDI_MPSSE_EP_BULK_IN);
+        udd_ep_run(UDI_MPSSE_EP_BULK_OUT, false, MPSSE_TX_BUFFER, 64, mpsse_vendor_bulk_out_received);
+        MPSSE_TRANSACTION_LOCK = 1;
+        NUM_PROCESSED_CMDS = 0;
+    }
     return true;
 }
 
-#define BITMODE_MPSSE 0x02
-
-#define SIO_RESET_REQUEST             0x00
-#define SIO_SET_LATENCY_TIMER_REQUEST 0x09
-#define SIO_GET_LATENCY_TIMER_REQUEST 0x0A
-#define SIO_SET_BITMODE_REQUEST       0x0B
-
-#define SIO_RESET_SIO 0
-#define SIO_RESET_PURGE_RX 1
-#define SIO_RESET_PURGE_TX 2
 
 
 bool mpsse_setup_in_received(void)
@@ -61,11 +77,35 @@ bool mpsse_setup_in_received(void)
     if (udd_g_ctrlreq.req.wIndex != 0x01) {
         return false;
     }
-    if ((udd_g_ctrlreq.req.bRequest == SIO_RESET_REQUEST)) {
-        // TODO: cancel old run if one setup
-        udd_ep_abort(UDI_MPSSE_EP_BULK_OUT);
-        udd_ep_run(UDI_MPSSE_EP_BULK_OUT, false, MPSSE_TX_BUFFER, 512, mpsse_vendor_bulk_out_received);
-        MPSSE_TRANSACTION_LOCK = 1;
+    if (udd_g_ctrlreq.req.bRequest == 0xA0) {
+        MPSSE_RX_BUFFER[0] = MPSSE_CUR_CMD;
+        MPSSE_RX_BUFFER[1] = MPSSE_TX_IDX & 0xFF;
+        MPSSE_RX_BUFFER[2] = MPSSE_TX_BYTES & 0xFF;
+        MPSSE_RX_BUFFER[3] = MPSSE_RX_BYTES & 0xFF;
+        MPSSE_RX_BUFFER[4] = MPSSE_TRANSMISSION_LEN & 0xFF;
+        MPSSE_RX_BUFFER[5] = MPSSE_TRANSACTION_LOCK;
+        MPSSE_RX_BUFFER[6] = NUM_PROCESSED_CMDS & 0xFF;
+        MPSSE_RX_BUFFER[7] = (NUM_PROCESSED_CMDS >> 8) & 0xFF;
+        MPSSE_RX_BUFFER[8] = (NUM_PROCESSED_CMDS >> 16) & 0xFF;
+        MPSSE_RX_BUFFER[9] = (NUM_PROCESSED_CMDS >> 24) & 0xFF;
+        MPSSE_RX_BUFFER[10] = MPSSE_LOOPBACK_ENABLED;
+        udd_g_ctrlreq.payload = MPSSE_RX_BUFFER;
+        udd_g_ctrlreq.payload_size = 11;
+        return true;
+    }
+
+    uint16_t wValue = udd_g_ctrlreq.req.wValue;
+    if (udd_g_ctrlreq.req.bRequest == 0xA1) {
+        uint32_t addr = (uint32_t)(MPSSE_RX_BUFFER + wValue);
+        addr &= ~(0b11);
+        udd_g_ctrlreq.payload = (void *) addr;
+        udd_g_ctrlreq.payload_size = 256;
+    }
+    if (udd_g_ctrlreq.req.bRequest == 0xA2) {
+        uint32_t addr = (uint32_t)(MPSSE_TX_BUFFER + wValue);
+        addr &= ~(0b11);
+        udd_g_ctrlreq.payload = (void *) addr;
+        udd_g_ctrlreq.payload_size = 256;
     }
     return true;
 }
@@ -128,10 +168,15 @@ uint8_t mpsse_send_byte(uint8_t value)
     return mpsse_send_bits(value, 8);
 }
 
+// TODO: handle tx length too short
 void mpsse_handle_transmission(void)
 {
     uint8_t read_val = 0;
     if (MPSSE_TRANSMISSION_LEN == 0) {
+        if (mpsse_tx_buffer_remaining() < 1) {
+            MPSSE_TX_REQ = 1;
+            return; //need more data
+        }
         // not doing a transmission currently, so read length in
         // TODO: handle invalid lengths
         MPSSE_TRANSMISSION_LEN = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
@@ -149,6 +194,10 @@ void mpsse_handle_transmission(void)
             MPSSE_CUR_CMD = 0;
             return;
         }
+    }
+    if (mpsse_tx_buffer_remaining() < 0) {
+        MPSSE_TX_REQ = 1;
+        return;
     }
 
     // todo: handle invalid command: no write or read
@@ -176,12 +225,20 @@ void mpsse_handle_special(void)
     switch (MPSSE_CUR_CMD) {
     case FTDI_SET_OPLB:
         // value, direction
+        if (mpsse_tx_buffer_remaining() < 2) {
+            MPSSE_TX_REQ = 1;
+            return; //need to read more data in
+        }
         MPSSE_CUR_CMD = 0x00;
         value = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
         direction = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
         break;
     case FTDI_SET_OPHB:
         // value, direction
+        if (mpsse_tx_buffer_remaining() < 2) {
+            MPSSE_TX_REQ = 1;
+            return; //need to read more data in
+        }
         MPSSE_CUR_CMD = 0x00;
         value = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
         direction = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
@@ -196,7 +253,7 @@ void mpsse_handle_special(void)
         break;
     case FTDI_READ_IPHB:
         MPSSE_CUR_CMD = 0x00;
-        MPSSE_RX_BUFFER[0] = 0x00;
+        MPSSE_RX_BUFFER[0] = 0x01;
         MPSSE_RX_BYTES = 1;
         MPSSE_TRANSACTION_LOCK = 1;
         MPSSE_TX_IDX++;
@@ -226,13 +283,27 @@ void mpsse_vendor_bulk_out_received(udd_ep_status_t status,
                                   iram_size_t nb_transfered, udd_ep_id_t ep)
 {
     // we just receive stuff here, then handle in main()
-    MPSSE_TX_BYTES = nb_transfered;
-    MPSSE_TX_IDX = 0;
-    MPSSE_CUR_CMD = 0;
     if (UDD_EP_TRANSFER_OK != status) {
         // restart
-        udd_ep_run(UDI_MPSSE_EP_BULK_OUT, 0, MPSSE_TX_BUFFER, 512, mpsse_vendor_bulk_out_received);
+        //TODO: Separate for BAK an non BAK cases
+        udd_ep_run(UDI_MPSSE_EP_BULK_OUT, 0, MPSSE_TX_REQ ? MPSSE_TX_BUFFER_BAK : MPSSE_TX_BUFFER, 
+            64 - mpsse_tx_buffer_remaining(), mpsse_vendor_bulk_out_received);
+        MPSSE_TRANSACTION_LOCK = 1;
+        return;
     }
+
+    if (MPSSE_TX_REQ) {
+        // we read into the backup buffer, move the data over to the usual one
+        MPSSE_TX_REQ = 0;
+        for (uint16_t i = 0; i < nb_transfered; i++) {
+            MPSSE_TX_BUFFER[i + mpsse_tx_buffer_remaining()] = MPSSE_TX_BUFFER_BAK[i];
+        }
+        MPSSE_TX_BYTES = mpsse_tx_buffer_remaining() + nb_transfered;
+    } {
+        MPSSE_TX_BYTES = nb_transfered;
+    }
+    MPSSE_TX_IDX = 0;
+    MPSSE_TRANSACTION_LOCK = 0;
 }
 
 void mpsse_vendor_bulk_in_received(udd_ep_status_t status, iram_size_t nb_transferred, udd_ep_id_t ep)
@@ -251,6 +322,8 @@ void mpsse_vendor_bulk_in_received(udd_ep_status_t status, iram_size_t nb_transf
     
     if (MPSSE_RX_BYTES) {
         udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, MPSSE_RX_BYTES, mpsse_vendor_bulk_in_received);
+    } else {
+        MPSSE_TRANSACTION_LOCK = 0;
     }
 
 }
@@ -271,15 +344,28 @@ void MPSSE_main_sendrecv_byte(void)
         return;
     }
 
-    // we're at end of the TX buffer, so read more in
-    if (MPSSE_TX_IDX == MPSSE_TX_BYTES) {
+    if (MPSSE_TX_REQ) {
+        // command split between USB transactions,
+        // so move unused data back to start and read more in
+        for (uint16_t i = 0; i < mpsse_tx_buffer_remaining(); i++) {
+            MPSSE_TX_BUFFER[i] = MPSSE_TX_BUFFER[i+MPSSE_TX_IDX];
+        }
         MPSSE_TRANSACTION_LOCK = 1;
-        udd_ep_run(UDI_MPSSE_EP_BULK_OUT, 0, MPSSE_TX_BUFFER, 512, mpsse_vendor_bulk_out_received);
+        udd_ep_run(UDI_MPSSE_EP_BULK_OUT, 0, 
+            MPSSE_TX_BUFFER_BAK, 63 - mpsse_tx_buffer_remaining(), 
+            mpsse_vendor_bulk_out_received);
+    }
+
+    // we're at end of the TX buffer, so read more in
+    if (mpsse_tx_buffer_remaining() <= 0) {
+        MPSSE_TRANSACTION_LOCK = 1;
+        udd_ep_run(UDI_MPSSE_EP_BULK_OUT, 0, MPSSE_TX_BUFFER, 64, mpsse_vendor_bulk_out_received);
         return;
     }
 
     if (MPSSE_CUR_CMD == 0x00) {
         MPSSE_CUR_CMD = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
+        NUM_PROCESSED_CMDS++;
     }
 
     if (MPSSE_CUR_CMD & 0x80) {
