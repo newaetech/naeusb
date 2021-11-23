@@ -1,4 +1,5 @@
 #include "naeusb_default.h"
+#include <string.h>
 
 #define uint8_t unsigned char
 
@@ -17,9 +18,11 @@ static uint8_t MPSSE_TRANSACTION_LOCK = 1;  //Currently sending data back to the
 
 static uint32_t NUM_PROCESSED_CMDS = 0;
 static uint8_t MPSSE_TX_REQ = 0;
+static uint8_t MPSSE_FIRST_BIT = 0; // AHHHHH handle first bit differently in every transmission
 
 
 COMPILER_WORD_ALIGNED volatile uint8_t MPSSE_RX_BUFFER[64] __attribute__ ((__section__(".mpssemem")));
+// COMPILER_WORD_ALIGNED volatile uint8_t MPSSE_RX_CTRL_BUFFER[64] __attribute__ ((__section__(".mpssemem")));
 COMPILER_WORD_ALIGNED volatile uint8_t MPSSE_TX_BUFFER[64] __attribute__ ((__section__(".mpssemem"))) = {0};
 COMPILER_WORD_ALIGNED volatile uint8_t MPSSE_TX_BUFFER_BAK[64] __attribute__ ((__section__(".mpssemem"))) = {0};
 
@@ -35,10 +38,36 @@ void mpsse_vendor_bulk_out_received(udd_ep_status_t status,
 #define SIO_GET_LATENCY_TIMER_REQUEST 0x0A
 #define SIO_SET_BITMODE_REQUEST       0x0B
 
+// TODO: DOUT and DIN are technically backwards, even though this chip is the master
+#if AVRISP_USEUART
+    #define MPSSE_DOUT_GPIO AVRISP_MOSI_GPIO
+    #define MPSSE_DIN_GPIO  AVRISP_MISO_GPIO
+    #define MPSSE_SCK_GPIO  AVRISP_SCK_GPIO
+#else
+    #define MPSSE_DOUT_GPIO SPI_MOSI_GPIO
+    #define MPSSE_DIN_GPIO SPI_MISO_GPIO
+    #define MPSSE_SCK_GPIO SPI_SPCK_GPIO
+#endif
+
+#define MPSSE_TMS_GPIO PIN_PDIC_GPIO
+
+static uint32_t MPSSE_PINS_GPIO[8] = {
+    MPSSE_SCK_GPIO,
+    MPSSE_DIN_GPIO,
+    MPSSE_DOUT_GPIO,
+    MPSSE_TMS_GPIO
+};
+
 #define SIO_RESET_SIO 0
 #define SIO_RESET_PURGE_RX 1
 #define SIO_RESET_PURGE_TX 2
+
 extern void switch_configurations(void);
+
+static int16_t mpsse_rx_buffer_remaining(void)
+{
+    return sizeof(MPSSE_RX_BUFFER) - MPSSE_RX_BYTES;
+}
 
 static int16_t mpsse_tx_buffer_remaining(void)
 {
@@ -60,11 +89,20 @@ bool mpsse_setup_out_received(void)
     }
     if ((udd_g_ctrlreq.req.bRequest == SIO_RESET_REQUEST)) {
         // TODO: cancel old run if one setup
+        memset(MPSSE_RX_BUFFER, 0, sizeof(MPSSE_RX_BUFFER));
+        // memset(MPSSE_RX_CTRL_BUFFER, 0, sizeof(MPSSE_RX_CTRL_BUFFER));
+        memset(MPSSE_TX_BUFFER, 0, sizeof(MPSSE_TX_BUFFER));
+        memset(MPSSE_TX_BUFFER_BAK, 0, sizeof(MPSSE_TX_BUFFER_BAK));
         udd_ep_abort(UDI_MPSSE_EP_BULK_OUT);
         udd_ep_abort(UDI_MPSSE_EP_BULK_IN);
-        udd_ep_run(UDI_MPSSE_EP_BULK_OUT, false, MPSSE_TX_BUFFER, 64, mpsse_vendor_bulk_out_received);
+        gpio_configure_pin(MPSSE_DIN_GPIO, PIO_DEFAULT);
+        gpio_configure_pin(MPSSE_DOUT_GPIO, PIO_OUTPUT_0);
+        gpio_configure_pin(MPSSE_SCK_GPIO, PIO_OUTPUT_0);
+        gpio_configure_pin(MPSSE_TMS_GPIO, PIN_PDIC_OUT_FLAGS);
+
         MPSSE_TRANSACTION_LOCK = 1;
         NUM_PROCESSED_CMDS = 0;
+        udd_ep_run(UDI_MPSSE_EP_BULK_OUT, false, MPSSE_TX_BUFFER, 64, mpsse_vendor_bulk_out_received);
     }
     return true;
 }
@@ -138,15 +176,54 @@ enum FTDI_SPECIAL_CMDS {
 };
 
 
+#define DOUT_NMATCH_SCK ((gpio_pin_is_low(MPSSE_SCK_GPIO) ? \
+                    !(MPSSE_CUR_CMD & FTDI_NEG_CLK_WRITE) : \
+                    !!(MPSSE_CUR_CMD & FTDI_NEG_CLK_WRITE)))
+
+#define DIN_NMATCH_SCK ((gpio_pin_is_low(MPSSE_SCK_GPIO) ? \
+                    !!(MPSSE_CUR_CMD & FTDI_NEG_CLK_READ) : \
+                    !(MPSSE_CUR_CMD & FTDI_NEG_CLK_READ)))
+
+
 uint8_t mpsse_send_bit(uint8_t value)
 {
     value &= 0x01;
-    uint8_t read_value;
+    uint8_t read_value = 0;
+    uint32_t dpin;
     if (MPSSE_LOOPBACK_ENABLED) {
-        read_value = value;
-    } else {
-        // actually do write
+        return value & 0x01;
     }
+
+        // actually do write
+    dpin = MPSSE_DOUT_GPIO;
+
+    if (DOUT_NMATCH_SCK) { //Clock out data on IDLE->NON_IDLE
+        if (value) {
+            gpio_set_pin_high(dpin);
+        } else {
+            gpio_set_pin_low(dpin);
+        }
+    }
+    gpio_toggle_pin(MPSSE_SCK_GPIO);
+
+    if (DIN_NMATCH_SCK) { //read data on IDLE->NON_IDLE
+        read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
+    }
+
+    if (DOUT_NMATCH_SCK) { //Clock out data on NON_IDLE->IDLE
+        if (value) {
+            gpio_set_pin_high(dpin);
+        } else {
+            gpio_set_pin_low(dpin);
+        }
+    }
+
+    gpio_toggle_pin(MPSSE_SCK_GPIO);
+
+    if (DIN_NMATCH_SCK) { //read data on NON_IDLE->IDLE
+        read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
+    }
+    
     return read_value & 0x01;
 }
 
@@ -165,7 +242,74 @@ uint8_t mpsse_send_bits(uint8_t value, uint8_t num_bits)
 
 uint8_t mpsse_send_byte(uint8_t value)
 {
+
     return mpsse_send_bits(value, 8);
+}
+
+uint8_t mpsse_tms_bit_send(uint8_t value)
+{
+    value &= 0x01;
+    uint8_t read_value = 0;
+    uint32_t dpin;
+
+        // actually do write
+    dpin = MPSSE_TMS_GPIO;
+
+    if (DOUT_NMATCH_SCK) { //Clock out data on IDLE->NON_IDLE
+        if (value) {
+            gpio_set_pin_high(dpin);
+        } else {
+            gpio_set_pin_low(dpin);
+        }
+    }
+    gpio_toggle_pin(MPSSE_SCK_GPIO);
+
+    if (DIN_NMATCH_SCK) { //read data on IDLE->NON_IDLE
+        read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
+    }
+
+    if (DOUT_NMATCH_SCK) { //Clock out data on NON_IDLE->IDLE
+        if (value) {
+            gpio_set_pin_high(dpin);
+        } else {
+            gpio_set_pin_low(dpin);
+        }
+    }
+
+    gpio_toggle_pin(MPSSE_SCK_GPIO);
+
+    if (DIN_NMATCH_SCK) { //read data on NON_IDLE->IDLE
+        read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
+    }
+    
+    return read_value & 0x01;
+
+}
+
+uint8_t mpsse_tms_send(uint8_t value, uint8_t num_bits)
+{
+    uint8_t read_value = 0;
+    // one bit is clocked output on TDI for some reason
+    uint8_t bitval = 0;
+    if (MPSSE_CUR_CMD & FTDI_LITTLE_ENDIAN) {
+        bitval = value & 0x01;
+    } else {
+        bitval = (value >> 7) & 0x01;
+    }
+    if (bitval) {
+        gpio_set_pin_high(MPSSE_DOUT_GPIO);
+    } else {
+        gpio_set_pin_low(MPSSE_DOUT_GPIO);
+    }
+    for (uint8_t i = 1; i < num_bits; i++) {
+        if (MPSSE_CUR_CMD & FTDI_LITTLE_ENDIAN) {
+            read_value |= mpsse_tms_bit_send((value >> i) & 0x01) << i;
+        } else {
+            read_value |= mpsse_tms_bit_send((value >> (7 - i)) & 0x01) << (7 - i);
+        }
+
+    }
+	return read_value;
 }
 
 // TODO: handle tx length too short
@@ -184,12 +328,37 @@ void mpsse_handle_transmission(void)
         if (!(MPSSE_CUR_CMD & FTDI_BIT_MODE)) {
             // clock in high byte of length if in byte mode
             MPSSE_TRANSMISSION_LEN |= MPSSE_TX_BUFFER[MPSSE_TX_IDX++] << 8;
+            MPSSE_FIRST_BIT = 1;
         } else {
             // take care of bit transmission right now
-            read_val = mpsse_send_bits(MPSSE_TX_BUFFER[MPSSE_TX_IDX++], MPSSE_TRANSMISSION_LEN);
-            MPSSE_TRANSMISSION_LEN = 0;
-            if (MPSSE_CUR_CMD & FTDI_READ_TDO) {
-                MPSSE_RX_BUFFER[MPSSE_RX_BYTES++] = read_val;
+            if (MPSSE_CUR_CMD & FTDI_WRITE_TMS) {
+                mpsse_tms_send(MPSSE_TX_BUFFER[MPSSE_TX_IDX++], MPSSE_TRANSMISSION_LEN);
+            } else {
+                uint8_t value = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
+				uint8_t bit;
+                if (MPSSE_CUR_CMD & FTDI_LITTLE_ENDIAN) {
+                    bit = value & 0x01;
+                } else {
+                    bit = value & 0x80;
+                }
+
+                if (bit) {
+                    gpio_set_pin_high(MPSSE_DOUT_GPIO);
+                } else {
+                    gpio_set_pin_low(MPSSE_DOUT_GPIO);
+                }
+                read_val = mpsse_send_bits(MPSSE_TX_BUFFER[MPSSE_TX_IDX++], MPSSE_TRANSMISSION_LEN);
+                MPSSE_TRANSMISSION_LEN = 0;
+                if (MPSSE_CUR_CMD & FTDI_READ_TDO) {
+                    if (mpsse_rx_buffer_remaining() > 0) {
+                        MPSSE_RX_BUFFER[MPSSE_RX_BYTES++] = read_val;
+                    } else {
+                        MPSSE_TRANSACTION_LOCK = 1;
+                        udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, 
+                            64, mpsse_vendor_bulk_in_received);
+                        return;
+                    }
+                }
             }
             MPSSE_CUR_CMD = 0;
             return;
@@ -201,14 +370,40 @@ void mpsse_handle_transmission(void)
     }
 
     // todo: handle invalid command: no write or read
-    if (MPSSE_CUR_CMD & (FTDI_WRITE_TDI | FTDI_WRITE_TMS)) {
+    // TMS works differently for some reason, so handle it separately
+    if (MPSSE_CUR_CMD & (FTDI_WRITE_TDI)) {
+        // handle first bit separately for some reason
+        // AHHHHHHHH
+        if (MPSSE_FIRST_BIT && (!MPSSE_LOOPBACK_ENABLED)) {
+            uint8_t value = (MPSSE_TX_BUFFER[MPSSE_TX_IDX]);
+            uint8_t bit = 0;
+            if (MPSSE_CUR_CMD & FTDI_LITTLE_ENDIAN) {
+                bit = value & 0x01;
+            } else {
+                bit = value & 0x80;
+            }
+
+            if (bit) {
+                gpio_set_pin_high(MPSSE_DOUT_GPIO);
+            } else {
+                gpio_set_pin_low(MPSSE_DOUT_GPIO);
+            }
+            MPSSE_FIRST_BIT = 0;
+        }
         read_val = mpsse_send_byte(MPSSE_TX_BUFFER[MPSSE_TX_IDX++]);
     } else {
         read_val = mpsse_send_byte(0);
     }
 
     if (MPSSE_CUR_CMD & FTDI_READ_TDO) {
-        MPSSE_RX_BUFFER[MPSSE_RX_BYTES++] = read_val;
+        if (mpsse_rx_buffer_remaining() > 0) {
+            MPSSE_RX_BUFFER[MPSSE_RX_BYTES++] = read_val;
+        } else {
+            MPSSE_TRANSACTION_LOCK = 1;
+            udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, 
+                64, mpsse_vendor_bulk_in_received);
+            return;
+        }
     }
 
     // we're at the end of the transmission
@@ -232,6 +427,16 @@ void mpsse_handle_special(void)
         MPSSE_CUR_CMD = 0x00;
         value = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
         direction = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
+        for (uint8_t i = 0; i < 4; i++) {
+            if (direction & (1 << i)) {
+				if (value) {
+					gpio_configure_pin(MPSSE_PINS_GPIO[i], PIO_OUTPUT_1);
+				} else {
+					gpio_configure_pin(MPSSE_PINS_GPIO[i], PIO_OUTPUT_0);
+				}
+            }
+        }
+
         break;
     case FTDI_SET_OPHB:
         // value, direction
