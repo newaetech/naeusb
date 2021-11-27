@@ -1116,7 +1116,11 @@ bool udc_process_setup(void)
 	}
 
 	// If interface request then try to decode it in UDI
-	if (Udd_setup_recipient() == USB_REQ_RECIP_INTERFACE) {
+	if ((Udd_setup_recipient() == USB_REQ_RECIP_INTERFACE) || (Udd_setup_recipient() == USB_REQ_RECIP_DEVICE)) {
+		if (udd_g_ctrlreq.req.wIndex == 2) {
+			udd_g_ctrlreq.req.wIndex = 1;
+		}
+
 		if (udc_req_iface()) {
 			return true;
 		}
