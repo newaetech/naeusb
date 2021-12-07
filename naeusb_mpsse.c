@@ -65,18 +65,37 @@ void mpsse_vendor_bulk_out_received(udd_ep_status_t status,
 
 // NOTE: DOUT is TDI and DIN is TDO
 #if AVRISP_USEUART
+#ifndef MPSSE_DOUT_GPIO
     #define MPSSE_DOUT_GPIO AVRISP_MOSI_GPIO
+#endif
+
+#ifndef MPSSE_DIN_GPIO
     #define MPSSE_DIN_GPIO  AVRISP_MISO_GPIO
+#endif
+
+#ifndef MPSSE_SCK_GPIO
     #define MPSSE_SCK_GPIO  AVRISP_SCK_GPIO
+#endif
 #else
+#ifndef MPSSE_DOUT_GPIO
     #define MPSSE_DOUT_GPIO SPI_MOSI_GPIO
+#endif
+#ifndef MPSSE_DIN_GPIO
     #define MPSSE_DIN_GPIO SPI_MISO_GPIO
+#endif
+#ifndef MPSSE_SCK_GPIO
     #define MPSSE_SCK_GPIO SPI_SPCK_GPIO
+#endif
 #endif
 
 // use PDIC/D for TMS/TRST
-#define MPSSE_TMS_GPIO PIN_PDIC_GPIO
-#define MPSSE_TRST_GPIO PIN_PDIDTX_GPIO
+#ifndef MPSSE_TMS_GPIO
+    #define MPSSE_TMS_GPIO PIN_PDIC_GPIO
+#endif
+
+#ifndef MPSSE_TRST_GPIO
+    #define MPSSE_TRST_GPIO PIN_PDIDTX_GPIO
+#endif
 
 // pins used for MPSSE IO
 static uint32_t MPSSE_PINS_GPIO[8] = {
@@ -141,7 +160,7 @@ bool mpsse_setup_out_received(void)
         gpio_configure_pin(MPSSE_DIN_GPIO, PIO_DEFAULT | PIO_TYPE_PIO_INPUT);
         gpio_configure_pin(MPSSE_DOUT_GPIO, PIO_OUTPUT_0);
         gpio_configure_pin(MPSSE_SCK_GPIO, PIO_OUTPUT_0);
-        gpio_configure_pin(MPSSE_TMS_GPIO, PIN_PDIC_OUT_FLAGS);
+        gpio_configure_pin(MPSSE_TMS_GPIO, PIO_OUTPUT_0);
 		MPSSE_ENABLED = 1;
         MPSSE_TRANSACTION_LOCK = 1;
         NUM_PROCESSED_CMDS = 0;
