@@ -293,7 +293,7 @@ void main_vendor_bulk_out_received(udd_ep_status_t status,
 
     if (blockendpoint_usage == bep_emem){
         for(unsigned int i = 0; i < nb_transfered; i++){
-            xram[i+bulk_fpga_write_addr] = main_buf_loopback[i];
+            xram[bulk_fpga_write_addr++] = main_buf_loopback[i];
         }
 
         if (FPGA_lockstatus() == fpga_blockout){
