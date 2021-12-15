@@ -90,21 +90,45 @@ void mpsse_vendor_bulk_out_received(udd_ep_status_t status,
 
 // use PDIC/D for TMS/TRST
 #ifndef MPSSE_TMS_GPIO
-    #define MPSSE_TMS_GPIO PIN_PDIC_GPIO
+    // #define MPSSE_TMS_GPIO PIN_PDIC_GPIO
+    #error "MPSSE_TMS_GPIO define required for JTAG"
 #endif
 
-#ifndef MPSSE_TRST_GPIO
-    #define MPSSE_TRST_GPIO PIN_PDIDTX_GPIO
-#endif
+// #ifndef MPSSE_TRST_GPIO
+//     #define MPSSE_TRST_GPIO PIN_PDIDTX_GPIO
+// #endif
 
 // pins used for MPSSE IO
-static uint32_t MPSSE_PINS_GPIO[8] = {
+
+
+static uint32_t MPSSE_PINS_GPIO[12] = {
     MPSSE_SCK_GPIO,
-    MPSSE_DIN_GPIO,
     MPSSE_DOUT_GPIO,
+    MPSSE_DIN_GPIO,
     MPSSE_TMS_GPIO,
-    MPSSE_TRST_GPIO
+    #ifdef MPSSE_GPIOL0
+    MPSSE_GPIOL0,
+    #else
+    0x00,
+    #endif
+    #ifdef MPSSE_GPIOL1
+    MPSSE_GPIOL1,
+    #else
+    0x00,
+    #endif
+    #ifdef MPSSE_GPIOL2
+    MPSSE_GPIOL2,
+    #else
+    0x00,
+    #endif
+    #ifdef MPSSE_GPIOL3
+    MPSSE_GPIOL3,
+    #else
+    0x00,
+    #endif
+
 };
+
 
 /*
 Gets remaining available space in the RX buffer
@@ -238,17 +262,26 @@ enum FTDI_SPECIAL_CMDS {
     FTDI_ADT_CLK_ON=0x96,      // adaptive clock for ARM (ignored)
     FTDI_ADT_CLK_OFF           // ignored
 };
+// static uint8_t MPSSE_SCK_IDLE_LEVEL = 0; // sck can idle high or low
 
-#define DOUT_NMATCH_SCK ((gpio_pin_is_low(MPSSE_SCK_GPIO) ? \
+#define DOUT_NMATCH_SCK ((MPSSE_SCK_IDLE_LEVEL ? \
                     !!(MPSSE_CUR_CMD & FTDI_NEG_CLK_WRITE) : \
                     !(MPSSE_CUR_CMD & FTDI_NEG_CLK_WRITE)))
 
-#define DIN_NMATCH_SCK ((gpio_pin_is_low(MPSSE_SCK_GPIO) ? \
+#define DIN_NMATCH_SCK ((MPSSE_SCK_IDLE_LEVEL ? \
                     !!(MPSSE_CUR_CMD & FTDI_NEG_CLK_READ) : \
                     !(MPSSE_CUR_CMD & FTDI_NEG_CLK_READ)))
 
 // send one bit over TDI and read one bit on TDO
-// TODO: reimplement handling for different NEG_CLK configs
+/*
+This is a bit weird - basically, before we enter, TDI must be
+valid so that our first clock actually puts the bit out.
+
+This means that the 1 or 0 on TDI at the start will be
+clocked out, and this function just sets up the next bit and reads
+
+
+*/
 uint8_t mpsse_send_bit(uint8_t value)
 {
     value &= 0x01;
@@ -260,35 +293,54 @@ uint8_t mpsse_send_bit(uint8_t value)
 
         // actually do write
     dpin = MPSSE_DOUT_GPIO;
-
-    if (1) { //Clock out data on IDLE->NON_IDLE
-        if (value) {
-            gpio_set_pin_high(dpin);
-        } else {
-            gpio_set_pin_low(dpin);
-        }
+    // this is really dumb
+    if (value) {
+        gpio_set_pin_high(dpin);
+    } else {
+        gpio_set_pin_low(dpin);
     }
+    //setup delay
+    volatile uint8_t i = 0;
+    i = 0;
+    i = 0;
+    i = 0;
+
+    // last bit will be received on TDI
     gpio_toggle_pin(MPSSE_SCK_GPIO);
 
-    if (0) { //Clock out data on NON_IDLE->IDLE
-        if (value) {
-            gpio_set_pin_high(dpin);
-        } else {
-            gpio_set_pin_low(dpin);
-        }
-    }
+    // if (!(MPSSE_CUR_CMD & FTDI_NEG_CLK_WRITE)) { //Clock out data on IDLE->NON_IDLE
+    //     if (value) {
+    //         gpio_set_pin_high(dpin);
+    //     } else {
+    //         gpio_set_pin_low(dpin);
+    //     }
+    // } // worry about this later
 
-    if (1) { //read data on IDLE->NON_IDLE
-        read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
-    }
+    // now we can do new data
+
+    // if ((MPSSE_CUR_CMD & FTDI_NEG_CLK_WRITE)) { //Clock out data on IDLE->NON_IDLE
+    //     if (value) {
+    //         gpio_set_pin_high(dpin);
+    //     } else {
+    //         gpio_set_pin_low(dpin);
+    //     }
+    // }
+
+    
+    // if (!(MPSSE_CUR_CMD & FTDI_NEG_CLK_READ)) { //Clock out data on IDLE->NON_IDLE
+    //     read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
+    // }
+    //now we read data in
+    read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
 
 
+    // and set TDI for the next bit
 
     gpio_toggle_pin(MPSSE_SCK_GPIO);
 
-    if (0) { //read data on NON_IDLE->IDLE
-        read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
-    }
+    // if ((MPSSE_CUR_CMD & FTDI_NEG_CLK_READ)) { //Clock out data on IDLE->NON_IDLE
+    //     read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
+    // }
     
     return read_value & 0x01;
 }
@@ -298,6 +350,8 @@ uint8_t mpsse_send_bits(uint8_t value, uint8_t num_bits)
 {
     // if (num_bits > 8) num_bits = 8;
     uint8_t read_value = 0;
+    // if (MPSSE_SCK_IDLE_LEVEL)
+    //     gpio_toggle_pin(MPSSE_SCK_GPIO);
     for (uint8_t i = 0; i < num_bits; i++) {
         if (MPSSE_CUR_CMD & FTDI_LITTLE_ENDIAN) {
             // NOTE: for little endian, bits are written to bit 7, then shifted down
@@ -307,6 +361,8 @@ uint8_t mpsse_send_bits(uint8_t value, uint8_t num_bits)
             read_value |= mpsse_send_bit((value >> (7 - i)) & 0x01) << (7 - i);
         }
     }
+    // if (MPSSE_SCK_IDLE_LEVEL)
+    //     gpio_toggle_pin(MPSSE_SCK_GPIO);
     return read_value;
 }
 
@@ -326,32 +382,55 @@ uint8_t mpsse_tms_bit_send(uint8_t value)
         // actually do write
     dpin = MPSSE_TMS_GPIO;
 
-    if (1) { //Clock out data on IDLE->NON_IDLE
-        if (value) {
-            gpio_set_pin_high(dpin);
-        } else {
-            gpio_set_pin_low(dpin);
-        }
+    // dpin = MPSSE_DOUT_GPIO;
+    // this is really dumb
+    if (value) {
+        gpio_set_pin_high(dpin);
+    } else {
+        gpio_set_pin_low(dpin);
     }
+    //setup delay
+    volatile uint8_t i = 0;
+    i = 0;
+    i = 0;
+    i = 0;
+
+    // last bit will be received on TDI
     gpio_toggle_pin(MPSSE_SCK_GPIO);
 
-    if (1) { //read data on IDLE->NON_IDLE
-        read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
-    }
+    // if (!(MPSSE_CUR_CMD & FTDI_NEG_CLK_WRITE)) { //Clock out data on IDLE->NON_IDLE
+    //     if (value) {
+    //         gpio_set_pin_high(dpin);
+    //     } else {
+    //         gpio_set_pin_low(dpin);
+    //     }
+    // } // worry about this later
 
-    if (0) { //Clock out data on NON_IDLE->IDLE
-        if (value) {
-            gpio_set_pin_high(dpin);
-        } else {
-            gpio_set_pin_low(dpin);
-        }
-    }
+    // now we can do new data
+
+    // if ((MPSSE_CUR_CMD & FTDI_NEG_CLK_WRITE)) { //Clock out data on IDLE->NON_IDLE
+    //     if (value) {
+    //         gpio_set_pin_high(dpin);
+    //     } else {
+    //         gpio_set_pin_low(dpin);
+    //     }
+    // }
+
+    
+    // if (!(MPSSE_CUR_CMD & FTDI_NEG_CLK_READ)) { //Clock out data on IDLE->NON_IDLE
+    //     read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
+    // }
+    //now we read data in
+    read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
+
+
+    // and set TDI for the next bit
 
     gpio_toggle_pin(MPSSE_SCK_GPIO);
 
-    if (0) { //read data on NON_IDLE->IDLE
-        read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
-    }
+    // if ((MPSSE_CUR_CMD & FTDI_NEG_CLK_READ)) { //Clock out data on IDLE->NON_IDLE
+    //     read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
+    // }
     
     return read_value & 0x01;
 
@@ -379,12 +458,16 @@ uint8_t mpsse_tms_send(uint8_t value, uint8_t num_bits)
     // TODO: should this work like the normal rx with little endian?
     for (; i < num_bits; i++) {
         if (MPSSE_CUR_CMD & FTDI_LITTLE_ENDIAN) {
-            read_value |= mpsse_tms_bit_send((value >> i) & 0x01) << i;
+            read_value >> 1;
+            read_value |= mpsse_tms_bit_send((value >> i) & 0x01) << (7 - i);
+            // read_value |= mpsse_tms_bit_send((value >> i) & 0x01) << (i);
         } else {
             read_value |= mpsse_tms_bit_send((value >> (7 - i)) & 0x01) << (7 - i);
         }
 
     }
+    // if (MPSSE_SCK_IDLE_LEVEL)
+    //     gpio_toggle_pin(MPSSE_SCK_GPIO);
 	return read_value;
 }
 
@@ -421,21 +504,27 @@ void mpsse_handle_transmission(void)
             } else {
                 // need TDI valid before we start clocking
                 uint8_t value = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
-				uint8_t bit;
-                if (MPSSE_CUR_CMD & FTDI_LITTLE_ENDIAN) {
-                    bit = value & 0x01;
-                } else {
-                    bit = value & 0x80;
-                }
+				// uint8_t bit;
+                // if (MPSSE_CUR_CMD & FTDI_LITTLE_ENDIAN) {
+                //     bit = value & 0x01;
+                // } else {
+                //     bit = value & 0x80;
+                // }
 
-                if (bit) {
-                    gpio_set_pin_high(MPSSE_DOUT_GPIO);
-                } else {
-                    gpio_set_pin_low(MPSSE_DOUT_GPIO);
-                }
+                // if (bit) {
+                //     gpio_set_pin_high(MPSSE_DOUT_GPIO);
+                // } else {
+                //     gpio_set_pin_low(MPSSE_DOUT_GPIO);
+                // }
+                // if (MPSSE_SCK_IDLE_LEVEL)
+                //     gpio_toggle_pin(MPSSE_SCK_GPIO);
+
+                // if (MPSSE_CUR_CMD & )
 
                 // do the rest of the send
                 read_val = mpsse_send_bits(value, MPSSE_TRANSMISSION_LEN);
+                // if (MPSSE_SCK_IDLE_LEVEL)
+                //     gpio_toggle_pin(MPSSE_SCK_GPIO);
             }
 
             // bit send done
@@ -464,21 +553,25 @@ void mpsse_handle_transmission(void)
     }
 
     if (MPSSE_CUR_CMD & (FTDI_WRITE_TDI)) {
-        if ((!MPSSE_LOOPBACK_ENABLED)) {
+        if ((!MPSSE_LOOPBACK_ENABLED) && MPSSE_FIRST_BIT) {
             // data needs to be valid before we start clocking
-            uint8_t value = (MPSSE_TX_BUFFER[MPSSE_TX_IDX]);
-            uint8_t bit = 0;
-            if (MPSSE_CUR_CMD & FTDI_LITTLE_ENDIAN) {
-                bit = value & 0x01;
-            } else {
-                bit = value & 0x80;
-            }
+            // uint8_t value = (MPSSE_TX_BUFFER[MPSSE_TX_IDX]);
+            // uint8_t bit = 0;
+            // if (MPSSE_CUR_CMD & FTDI_LITTLE_ENDIAN) {
+            //     bit = value & 0x01;
+            // } else {
+            //     bit = value & 0x80;
+            // }
 
-            if (bit) {
-                gpio_set_pin_high(MPSSE_DOUT_GPIO);
-            } else {
-                gpio_set_pin_low(MPSSE_DOUT_GPIO);
-            }
+            // if (bit) {
+            //     gpio_set_pin_high(MPSSE_DOUT_GPIO);
+            // } else {
+            //     gpio_set_pin_low(MPSSE_DOUT_GPIO);
+            // }
+
+            // if (MPSSE_SCK_IDLE_LEVEL)
+            //     gpio_toggle_pin(MPSSE_SCK_GPIO);
+
             MPSSE_FIRST_BIT = 0;
         }
 
@@ -486,6 +579,8 @@ void mpsse_handle_transmission(void)
         read_val = mpsse_send_byte(MPSSE_TX_BUFFER[MPSSE_TX_IDX++]);
     } else {
         // if no write was requested, just send out 0's
+        // if (MPSSE_SCK_IDLE_LEVEL)
+        //     gpio_toggle_pin(MPSSE_SCK_GPIO);
         read_val = mpsse_send_byte(0);
     }
 
@@ -504,6 +599,9 @@ void mpsse_handle_transmission(void)
     if (--MPSSE_TRANSMISSION_LEN == 0) {
         // if at the end of the transmission, do the next command
         MPSSE_CUR_CMD = 0;
+        // if (MPSSE_SCK_IDLE_LEVEL)
+        //     gpio_toggle_pin(MPSSE_SCK_GPIO);
+
     }
 
 }
@@ -523,7 +621,9 @@ void mpsse_handle_special(void)
         direction = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
 
         // configure IO pins
-        for (uint8_t i = 0; i < 5; i++) {
+        for (uint8_t i = 0; i < 8; i++) {
+            if (!MPSSE_PINS_GPIO[i])
+                continue;
             if (direction & (1 << i)) {
 				if (value & (1 << i)) {
 					gpio_configure_pin(MPSSE_PINS_GPIO[i], PIO_OUTPUT_1);
@@ -537,6 +637,10 @@ void mpsse_handle_special(void)
             } else {
                 gpio_configure_pin(MPSSE_PINS_GPIO[i], PIO_DEFAULT);
             }
+        }
+
+        if (MPSSE_SCK_IDLE_LEVEL) {
+            gpio_toggle_pin(MPSSE_PINS_GPIO[0]); //no
         }
         // FPGA_releaselock();
         // while(!FPGA_setlock(fpga_generic));
