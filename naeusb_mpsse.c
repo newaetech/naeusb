@@ -22,22 +22,22 @@ struct  {
             uint8_t wtms:1;
             uint8_t special:1;
         } b;
-    } cur_cmd;
+    } cur_cmd; //the current command, available as a bit field or as a u8
 
-    int16_t tx_idx;
-    int16_t tx_bytes;
-    int16_t rx_bytes;
-    int16_t txn_len;
+    int16_t tx_idx; //the current index in the tx buffer
+    int16_t tx_bytes; //the number of bytes in the tx buffer
+    int16_t rx_bytes; //the number of bytes in the rx buffer
+    int16_t txn_len; //the length of the current transmission
 
-    uint8_t loopback_en;
-    uint8_t txn_lock;
+    uint8_t loopback_en; //loopback mode enabled?
+    uint8_t txn_lock; //lock for waiting on USB transaction
 
-    uint32_t n_processed_cmds;
+    uint32_t n_processed_cmds; //the number of commands we've processed
 
-    uint8_t tx_req;
-    uint8_t swd_mode;
-    uint8_t swd_out_en;
-    uint8_t enabled;
+    uint8_t tx_req; //more data from the pc is required to process the current command
+    uint8_t swd_mode; //swd mode enabled
+    uint8_t swd_out_en; //1 for swd output, 0 for swd input
+    uint8_t enabled; // mpsse mode enabled?
 
     uint32_t pins[12];
 } static mpsse_state = {
