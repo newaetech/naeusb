@@ -23,7 +23,7 @@ static uint32_t NUM_PROCESSED_CMDS = 0; // the number of commands processed for 
 static uint8_t MPSSE_TX_REQ = 0; // a command needs more bytes than currently available before it can be processed
 static uint8_t MPSSE_FIRST_BIT = 0; // First bit handled differently for some reason?
 
-static uint8_t MPSSE_ENABLED = 0;
+uint8_t MPSSE_ENABLED = 0;
 // static uint8_t MPSSE_COMMAND_IDX = 0; //debug variable for command history
 
 static uint8_t MPSSE_SCK_IDLE_LEVEL = 0; // sck can idle high or low
@@ -158,6 +158,8 @@ bool mpsse_setup_out_received(void)
         udc_stop();
         //change interface pointers so that the second one points to the MPSSE vendor interface
         switch_configurations(); 
+        MPSSE_ENABLED = 1;
+        MPSSE_TRANSACTION_LOCK = 1;
         //restart USB
         udc_start();
         return true;

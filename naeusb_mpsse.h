@@ -3,3 +3,5 @@
 
 void mpsse_register_handlers(void);
 void MPSSE_main_sendrecv_byte(void);
+
+extern uint8_t MPSSE_ENABLED;

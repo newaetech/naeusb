@@ -76,7 +76,7 @@ struct MS_REG_PROP_DESC_GUID {
 };
 
 
-#define MAKE_PROP_DESC_GUID \
+#define MAKE_PROP_DESC_GUID(INT) \
 { \
 .wLength= U162ARR (sizeof(struct MS_REG_PROP_DESC_GUID)), \
 .wDescriptorType = U162ARR(0x04), \
@@ -84,7 +84,7 @@ struct MS_REG_PROP_DESC_GUID {
 .wPropertyNameLength = U162ARR(sizeof(struct MS_DEV_GUID_NAME)), \
 .PropertyName = MAKE_DEV_GUID_NAME, \
 .wPropertyDataLength = U162ARR(sizeof(struct MS_DEV_INT_GUID) + MS_NULL_TERM_SIZE), \
-.PropertyData = MAKE_DEV_INT_GUID(0), \
+.PropertyData = MAKE_DEV_INT_GUID(INT), \
 MAKE_NULL_TERM \
 }
 
@@ -96,13 +96,13 @@ struct MS_COMP_ID_FEAT_DESC {
     struct MS_REG_PROP_DESC_GUID GUID;
 };
 
-#define MAKE_FEAT_DESC \
+#define MAKE_FEAT_DESC(INT) \
 { \
 .wLength=U162ARR(0x14), \
 .wDescriptorType=U162ARR(0x03), \
 .CompatibleID={'W', 'I', 'N', 'U', 'S', 'B', '\0', 0x00}, \
 .SubCompatibleID={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, \
-.GUID=MAKE_PROP_DESC_GUID \
+.GUID=MAKE_PROP_DESC_GUID(INT) \
 }
 
 
@@ -116,14 +116,14 @@ struct MS_FUNC_SUBSET_HEADER {
     struct MS_COMP_ID_FEAT_DESC FEAT;
 };
 
-#define MAKE_FUNC_SUBSET_HEADER \
+#define MAKE_FUNC_SUBSET_HEADER(INT) \
 { \
 .wLength=U162ARR(0x08), \
 .wDescriptorType=U162ARR(0x02), \
-.bFirstInterface=0x00, \
+.bFirstInterface=INT, \
 .bReserved=0x00, \
 .wSubsetLength=U162ARR(sizeof(struct MS_FUNC_SUBSET_HEADER)), \
-.FEAT=MAKE_FEAT_DESC \
+.FEAT=MAKE_FEAT_DESC(INT) \
 }
 #else
 struct MS_FUNC_SUBSET_HEADER {
@@ -141,7 +141,7 @@ struct MS_OS_DESC_SET_HEADER {
     uint8_t wDescriptorType[2];
     uint8_t dwWindowsVersion[4];
     uint8_t wTotalLength[2];
-    struct MS_FUNC_SUBSET_HEADER FUNC;
+    struct MS_FUNC_SUBSET_HEADER FUNC[2];
 };
 
 #define MAKE_OS_DESC_SET_HEADER \
@@ -150,7 +150,7 @@ struct MS_OS_DESC_SET_HEADER {
 .wDescriptorType=U162ARR(0x00), \
 .dwWindowsVersion={0x00, 0x00, 0x03, 0x06}, \
 .wTotalLength=U162ARR(sizeof(struct MS_OS_DESC_SET_HEADER)), \
-.FUNC = MAKE_FUNC_SUBSET_HEADER \
+.FUNC = {MAKE_FUNC_SUBSET_HEADER(0), MAKE_FUNC_SUBSET_HEADER(1)} \
 }
 
 static struct MS_OS_DESC_SET_HEADER MS_OS_DESC = MAKE_OS_DESC_SET_HEADER;
