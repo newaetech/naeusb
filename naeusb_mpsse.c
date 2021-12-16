@@ -1,39 +1,87 @@
 #include "naeusb_default.h"
 #include <string.h>
+#include "naeusb_mpsse.h"
 
 #define uint8_t unsigned char
 
 // used to switch USB configuration from CDC to MPSSE
 extern void switch_configurations(void);
 
-// static uint16_t MPSSE_TX_IDX = 0;
-static uint8_t MPSSE_CUR_CMD = 0; // the current MPSSE command
-static int16_t MPSSE_TX_IDX = 0; // the current TX buffer index
-static int16_t MPSSE_TX_BYTES = 0; // the number of bytes in the tx buffer
-static int16_t MPSSE_RX_BYTES = 2; // the number of bytes in the rx buffer NOTE: 2 bytes reserved for status
-static int16_t MPSSE_TRANSMISSION_LEN = 0; // the number of bits/bytes in the current data transmission
 
-static uint8_t MPSSE_LOOPBACK_ENABLED = 0; // connect TDI to TDO for loopback
+#pragma pack(1)
+struct  {
+    union {
+        uint8_t u8;
+        struct {
+            uint8_t neg_clk_write:1;
+            uint8_t bit_mode:1;
+            uint8_t neg_clk_read:1;
+            uint8_t lendian:1;
+            uint8_t wtdi:1;
+            uint8_t rtdo:1;
+            uint8_t wtms:1;
+            uint8_t special:1;
+        } b;
+    } cur_cmd;
 
-//need lock to make sure we don't accept another transaction until we're done sending data back
-//should be fine since  it looks like openocd just keeps retrying transaction until it works
-static uint8_t MPSSE_TRANSACTION_LOCK = 1;  //Currently sending data back to the PC
+    int16_t tx_idx;
+    int16_t tx_bytes;
+    int16_t rx_bytes;
+    int16_t txn_len;
 
-static uint32_t NUM_PROCESSED_CMDS = 0; // the number of commands processed for debug purposes
-static uint8_t MPSSE_TX_REQ = 0; // a command needs more bytes than currently available before it can be processed
-static uint8_t MPSSE_FIRST_BIT = 0; // First bit handled differently for some reason?
+    uint8_t loopback_en;
+    uint8_t txn_lock;
 
-static uint8_t SWD_MODE = 0;
-static uint8_t SWD_OUTPUT_EN = 0;
+    uint32_t n_processed_cmds;
 
-uint8_t MPSSE_ENABLED = 0;
-// static uint8_t MPSSE_COMMAND_IDX = 0; //debug variable for command history
+    uint8_t tx_req;
+    uint8_t swd_mode;
+    uint8_t swd_out_en;
+    uint8_t enabled;
 
-static uint8_t MPSSE_SCK_IDLE_LEVEL = 0; // sck can idle high or low
+    uint32_t pins[12];
+} static mpsse_state = {
+    .cur_cmd = 0x00, 
+    .tx_idx = 0x00, .tx_bytes = 0x00, .rx_bytes = 0x02, .txn_len = 0x00, 
+    .loopback_en = 0x00, .txn_lock = 0x00,
+    .n_processed_cmds = 0x00,
 
-// static uint32_t NUM_BYTE_SINCE_SEND_IMM = 0; // debug variable
+    .tx_req = 0x00, .swd_mode = 0x00, .swd_out_en = 0x00, .enabled = 0x00,
+    .pins = {
+        MPSSE_SCK_GPIO,
+        MPSSE_DOUT_GPIO,
+        MPSSE_DIN_GPIO,
+        MPSSE_TMS_GPIO,
+        #ifdef MPSSE_GPIOL0
+        MPSSE_GPIOL0,
+        #else
+        0x00,
+        #endif
+        #ifdef MPSSE_GPIOL1
+        MPSSE_GPIOL1,
+        #else
+        0x00,
+        #endif
+        #ifdef MPSSE_GPIOL2
+        MPSSE_GPIOL2,
+        #else
+        0x00,
+        #endif
+        #ifdef MPSSE_GPIOL3
+        MPSSE_GPIOL3,
+        #else
+        0x00,
+        #endif
+    }
+};
+#pragma pack()
 
+uint8_t mpsse_enabled(void)
+{
+    return mpsse_state.enabled;
+}
 
+//BUFFERS
 // holds data to send back to PC
 COMPILER_WORD_ALIGNED volatile uint8_t MPSSE_RX_BUFFER[64] __attribute__ ((__section__(".mpssemem")));
 // COMPILER_WORD_ALIGNED volatile uint8_t MPSSE_RX_CTRL_BUFFER[64] __attribute__ ((__section__(".mpssemem"))); //TODO: implement this
@@ -44,109 +92,17 @@ COMPILER_WORD_ALIGNED volatile uint8_t MPSSE_TX_BUFFER[80] __attribute__ ((__sec
 // holds data receieved from PC when a command overlaps between reads
 COMPILER_WORD_ALIGNED volatile uint8_t MPSSE_TX_BUFFER_BAK[64] __attribute__ ((__section__(".mpssemem"))) = {0};
 
-// debug variable for command history
-// COMPILER_WORD_ALIGNED volatile uint8_t MPSSE_COMMAND_HIST[256] __attribute__ ((__section__(".mpssemem"))) = {0};
-
 void mpsse_vendor_bulk_in_received(udd_ep_status_t status,
                                   iram_size_t nb_transfered, udd_ep_id_t ep);
 void mpsse_vendor_bulk_out_received(udd_ep_status_t status,
                                   iram_size_t nb_transfered, udd_ep_id_t ep);
-
-uint8_t mpsse_tms_bit_send(uint8_t value);
-
-// control USB requests, can mostly ignore
-#define BITMODE_MPSSE 0x02
-
-#define SIO_RESET_REQUEST             0x00
-#define SIO_SET_LATENCY_TIMER_REQUEST 0x09
-#define SIO_GET_LATENCY_TIMER_REQUEST 0x0A
-#define SIO_SET_BITMODE_REQUEST       0x0B
-
-#define SIO_RESET_SIO 0
-#define SIO_RESET_PURGE_RX 1
-#define SIO_RESET_PURGE_TX 2
-
-#define ADDR_IOROUTE 55 // FPGA IO addr for setting NRST (should remove?)
-
-// NOTE: DOUT is TDI and DIN is TDO
-#if AVRISP_USEUART
-#ifndef MPSSE_DOUT_GPIO
-    #define MPSSE_DOUT_GPIO AVRISP_MOSI_GPIO
-#endif
-
-#ifndef MPSSE_DIN_GPIO
-    #define MPSSE_DIN_GPIO  AVRISP_MISO_GPIO
-#endif
-
-#ifndef MPSSE_SCK_GPIO
-    #define MPSSE_SCK_GPIO  AVRISP_SCK_GPIO
-#endif
-#else
-#ifndef MPSSE_DOUT_GPIO
-    #define MPSSE_DOUT_GPIO SPI_MOSI_GPIO
-#endif
-#ifndef MPSSE_DIN_GPIO
-    #define MPSSE_DIN_GPIO SPI_MISO_GPIO
-#endif
-#ifndef MPSSE_SCK_GPIO
-    #define MPSSE_SCK_GPIO SPI_SPCK_GPIO
-#endif
-#endif
-
-// use PDIC/D for TMS/TRST
-#ifndef MPSSE_TMS_GPIO
-    // #define MPSSE_TMS_GPIO PIN_PDIC_GPIO
-    #error "MPSSE_TMS_GPIO define required for JTAG"
-#endif
-
-// #if MPSSE_SWD_SUPPORT
-// #ifndef MPSSE_SWDIOIN_GPIO
-//     #error "MPSSE_SWDIOIN_GPIO define required for SWD support"
-// #endif
-// #endif
-
-// #ifndef MPSSE_TRST_GPIO
-//     #define MPSSE_TRST_GPIO PIN_PDIDTX_GPIO
-// #endif
-
-// pins used for MPSSE IO
-
-
-static uint32_t MPSSE_PINS_GPIO[12] = {
-    MPSSE_SCK_GPIO,
-    MPSSE_DOUT_GPIO,
-    MPSSE_DIN_GPIO,
-    MPSSE_TMS_GPIO,
-    #ifdef MPSSE_GPIOL0
-    MPSSE_GPIOL0,
-    #else
-    0x00,
-    #endif
-    #ifdef MPSSE_GPIOL1
-    MPSSE_GPIOL1,
-    #else
-    0x00,
-    #endif
-    #ifdef MPSSE_GPIOL2
-    MPSSE_GPIOL2,
-    #else
-    0x00,
-    #endif
-    #ifdef MPSSE_GPIOL3
-    MPSSE_GPIOL3,
-    #else
-    0x00,
-    #endif
-
-};
-
 
 /*
 Gets remaining available space in the RX buffer
 */
 static int16_t mpsse_rx_buffer_remaining(void)
 {
-    return sizeof(MPSSE_RX_BUFFER) - MPSSE_RX_BYTES;
+    return sizeof(MPSSE_RX_BUFFER) - mpsse_state.rx_bytes;
 }
 
 /*
@@ -154,7 +110,7 @@ Gets the number of unprocessed TX bytes in the buffer
 */
 static int16_t mpsse_tx_buffer_remaining(void)
 {
-    return MPSSE_TX_BYTES - MPSSE_TX_IDX;
+    return mpsse_state.tx_bytes - mpsse_state.tx_idx;
 }
 
 bool mpsse_setup_out_received(void)
@@ -169,8 +125,8 @@ bool mpsse_setup_out_received(void)
         udc_stop();
         //change interface pointers so that the second one points to the MPSSE vendor interface
         switch_configurations(); 
-        MPSSE_ENABLED = 1;
-        MPSSE_TRANSACTION_LOCK = 1;
+        mpsse_state.enabled = 1;
+        mpsse_state.txn_lock = 1;
         //restart USB
         udc_start();
         return true;
@@ -198,10 +154,11 @@ bool mpsse_setup_out_received(void)
         gpio_configure_pin(MPSSE_DOUT_GPIO, PIO_OUTPUT_0);
         gpio_configure_pin(MPSSE_SCK_GPIO, PIO_OUTPUT_0);
         gpio_configure_pin(MPSSE_TMS_GPIO, PIO_OUTPUT_0);
-		MPSSE_ENABLED = 1;
-        MPSSE_TRANSACTION_LOCK = 1;
-        NUM_PROCESSED_CMDS = 0;
-        SWD_MODE = 0;
+        mpsse_state.enabled = 1;
+		mpsse_state.enabled = 1;
+        mpsse_state.txn_lock = 1;
+        mpsse_state.n_processed_cmds = 0;
+        mpsse_state.swd_mode = 0;
 
         // start looking for data from openocd
         udd_ep_run(UDI_MPSSE_EP_BULK_OUT, 0, MPSSE_TX_BUFFER, sizeof(MPSSE_TX_BUFFER_BAK), mpsse_vendor_bulk_out_received);
@@ -209,6 +166,7 @@ bool mpsse_setup_out_received(void)
     return true;
 }
 
+/* Handle ctrl transfer on interface 1/2. Mostly used for debug purposes */
 bool mpsse_setup_in_received(void)
 {
     // don't handle if not sent to our interface
@@ -218,17 +176,17 @@ bool mpsse_setup_in_received(void)
 
     // For debug, reads a bunch of internal variables back. TODO: change to using a separate buf
     if (udd_g_ctrlreq.req.bRequest == 0xA0) {
-        MPSSE_RX_BUFFER[0] = MPSSE_CUR_CMD;
-        MPSSE_RX_BUFFER[1] = MPSSE_TX_IDX & 0xFF;
-        MPSSE_RX_BUFFER[2] = MPSSE_TX_BYTES & 0xFF;
-        MPSSE_RX_BUFFER[3] = MPSSE_RX_BYTES & 0xFF;
-        MPSSE_RX_BUFFER[4] = MPSSE_TRANSMISSION_LEN & 0xFF;
-        MPSSE_RX_BUFFER[5] = MPSSE_TRANSACTION_LOCK;
-        MPSSE_RX_BUFFER[6] = NUM_PROCESSED_CMDS & 0xFF;
-        MPSSE_RX_BUFFER[7] = (NUM_PROCESSED_CMDS >> 8) & 0xFF;
-        MPSSE_RX_BUFFER[8] = (NUM_PROCESSED_CMDS >> 16) & 0xFF;
-        MPSSE_RX_BUFFER[9] = (NUM_PROCESSED_CMDS >> 24) & 0xFF;
-        MPSSE_RX_BUFFER[10] = MPSSE_LOOPBACK_ENABLED;
+        MPSSE_RX_BUFFER[0] = mpsse_state.cur_cmd.u8;
+        MPSSE_RX_BUFFER[1] = mpsse_state.tx_idx & 0xFF;
+        MPSSE_RX_BUFFER[2] = mpsse_state.tx_bytes & 0xFF;
+        MPSSE_RX_BUFFER[3] = mpsse_state.rx_bytes & 0xFF;
+        MPSSE_RX_BUFFER[4] = mpsse_state.txn_len & 0xFF;
+        MPSSE_RX_BUFFER[5] = mpsse_state.txn_lock;
+        MPSSE_RX_BUFFER[6] =  mpsse_state.n_processed_cmds & 0xFF;
+        MPSSE_RX_BUFFER[7] = (mpsse_state.n_processed_cmds >> 8) & 0xFF;
+        MPSSE_RX_BUFFER[8] = (mpsse_state.n_processed_cmds >> 16) & 0xFF;
+        MPSSE_RX_BUFFER[9] = (mpsse_state.n_processed_cmds >> 24) & 0xFF;
+        MPSSE_RX_BUFFER[10] = mpsse_state.loopback_en;
         udd_g_ctrlreq.payload = MPSSE_RX_BUFFER;
         udd_g_ctrlreq.payload_size = 11;
         return true;
@@ -251,73 +209,35 @@ bool mpsse_setup_in_received(void)
     return true;
 }
 
-
-enum FTDI_CMD_BITS {
-    FTDI_NEG_CLK_WRITE  = 1 << 0, // output data on negative clock edge
-    FTDI_BIT_MODE       = 1 << 1, // send 1-8 bytes
-    FTDI_NEG_CLK_READ   = 1 << 2, // read data on negative clock edge
-    FTDI_LITTLE_ENDIAN  = 1 << 3, // bytes data are in little endian format
-    FTDI_WRITE_TDI      = 1 << 4, // do a write on TDI
-    FTDI_READ_TDO       = 1 << 5, // read data from TDO
-    FTDI_WRITE_TMS      = 1 << 6, // do a write on TMS (bit mode only, 1/7 bits on TDO)
-    FTDI_SPECIAL_CMD    = 1 << 7, // special commands
-};
-
-enum FTDI_SPECIAL_CMDS {
-    FTDI_SET_OPLB = 0x80, // configure IO pins 0-7
-    FTDI_READ_IPLB,       // read IO pins values 0-7
-    FTDI_SET_OPHB,        // configure IO pins 8-11
-    FTDI_READ_IPHB,       // read IO pins 8-11
-    FTDI_EN_LOOPBACK,     // enable loopback
-    FTDI_DIS_LOOPBACK,    // disable loopback
-    FTDI_DIS_CLK_DIV_5 = 0x8A, // ignored
-    FTDI_EN_CLK_DIV_5 = 0x8A,  // ignored
-    FTDI_SEND_IMM=0x87,        // send data back to PC (hacky implementation due to small buffer, depends on async USB from openocd)
-    FTDI_ADT_CLK_ON=0x96,      // adaptive clock for ARM (ignored)
-    FTDI_ADT_CLK_OFF           // ignored
-};
-// static uint8_t MPSSE_SCK_IDLE_LEVEL = 0; // sck can idle high or low
-
-#define DOUT_NMATCH_SCK ((MPSSE_SCK_IDLE_LEVEL ? \
-                    !!(MPSSE_CUR_CMD & FTDI_NEG_CLK_WRITE) : \
-                    !(MPSSE_CUR_CMD & FTDI_NEG_CLK_WRITE)))
-
-#define DIN_NMATCH_SCK ((MPSSE_SCK_IDLE_LEVEL ? \
-                    !!(MPSSE_CUR_CMD & FTDI_NEG_CLK_READ) : \
-                    !(MPSSE_CUR_CMD & FTDI_NEG_CLK_READ)))
-
-// send one bit over TDI and read one bit on TDO
 /*
-This is a bit weird - basically, before we enter, TDI must be
-valid so that our first clock actually puts the bit out.
+Send one bit over TDI and read one bit on TDO
 
-This means that the 1 or 0 on TDI at the start will be
-clocked out, and this function just sets up the next bit and reads
+Does a small delay after setting DOUT high to
+allow a reasonable setup time for the target receiver.
 
-
+Really DOUT should be changed on the previous clock transition, but
+that makes things messier and comms is slow enough that this
+probably won't cause issues.
 */
 uint8_t mpsse_send_bit(uint8_t value)
 {
     value &= 0x01;
     uint8_t read_value = 0;
     uint32_t dpin;
-    if (MPSSE_LOOPBACK_ENABLED) {
+    if (mpsse_state.loopback_en) {
         return value & 0x01;
     }
 
-        // actually do write
+    // do write
     dpin = MPSSE_DOUT_GPIO;
-    // this is really dumb
     if (value) {
         gpio_set_pin_high(dpin);
     } else {
         gpio_set_pin_low(dpin);
     }
+
     //setup delay
     volatile uint8_t i = 0;
-    i = 0;
-    i = 0;
-    i = 0;
 
     // last bit will be received on TDI
     gpio_toggle_pin(MPSSE_SCK_GPIO);
@@ -325,68 +245,30 @@ uint8_t mpsse_send_bit(uint8_t value)
     //now we read data in
     read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
 
-
-    // and set TDI for the next bit
-
     gpio_toggle_pin(MPSSE_SCK_GPIO);
 
-    // if ((MPSSE_CUR_CMD & FTDI_NEG_CLK_READ)) { //Clock out data on IDLE->NON_IDLE
-    //     read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
-    // }
     
     return read_value & 0x01;
 }
 
-// send up to 8 bits over TDI/TDO
-uint8_t mpsse_send_bits(uint8_t value, uint8_t num_bits)
-{
-    // if (num_bits > 8) num_bits = 8;
-    uint8_t read_value = 0;
-    // if (MPSSE_SCK_IDLE_LEVEL)
-    //     gpio_toggle_pin(MPSSE_SCK_GPIO);
-    for (uint8_t i = 0; i < num_bits; i++) {
-        if (MPSSE_CUR_CMD & FTDI_LITTLE_ENDIAN) {
-            // NOTE: for little endian, bits are written to bit 7, then shifted down
-            read_value >>= 1;
-            if (SWD_MODE)
-                read_value |= mpsse_tms_bit_send((value >> i) & 0x01) << 7;
-            else
-                read_value |= mpsse_send_bit((value >> i) & 0x01) << 7;
-        } else {
-            if (SWD_MODE)
-                read_value |= mpsse_tms_bit_send((value >> (7 - i)) & 0x01) << (7 - i);
-            else
-                read_value |= mpsse_send_bit((value >> (7 - i)) & 0x01) << (7 - i);
-        }
-    }
-    // if (MPSSE_SCK_IDLE_LEVEL)
-    //     gpio_toggle_pin(MPSSE_SCK_GPIO);
-    return read_value;
-}
+/*
+Send a bit over SWD or read a bit
 
-// send 1 byte over TDI/TDO
-uint8_t mpsse_send_byte(uint8_t value)
-{
-    return mpsse_send_bits(value, 8);
-}
-
-// uint8_t mpsse_swd_bit_send(uint8_t value)
-// {
-//     if (SWD_)
-// }
-
-// send 1 bit over TDI/TMS
-uint8_t mpsse_tms_bit_send(uint8_t value)
+Works similarly to the regular bit send,
+except this is over TMS for read/write
+and the read is done on the rising edge of the clock
+*/
+uint8_t mpsse_swd_send_bit(uint8_t value)
 {
     value &= 0x01;
     uint8_t read_value = 0;
     uint32_t dpin;
 
-        // actually do write
+    // actually do write
     dpin = MPSSE_TMS_GPIO;
 
     // this is really dumb
-    if ((!SWD_MODE) || (SWD_OUTPUT_EN)) {
+    if (mpsse_state.swd_out_en) {
         if (value) {
             gpio_set_pin_high(dpin);
         } else {
@@ -396,21 +278,76 @@ uint8_t mpsse_tms_bit_send(uint8_t value)
 
     //setup delay
     volatile uint8_t i = 0;
-    i = 0;
-    i = 0;
-    i = 0;
 
-    if (SWD_MODE && (!SWD_OUTPUT_EN))
+    if (!mpsse_state.swd_out_en)
         read_value = gpio_pin_is_high(dpin);
+
     // last bit will be received on TDI
     gpio_toggle_pin(MPSSE_SCK_GPIO);
 
-    // i = 0;
-    //now we read data in
-    if ((!SWD_MODE)) {
-        read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
-    } else if (!SWD_OUTPUT_EN) {
+    gpio_toggle_pin(MPSSE_SCK_GPIO);
+
+    
+    return read_value & 0x01;
+}
+
+// send up to 8 bits over TDI/TDO
+uint8_t mpsse_send_bits(uint8_t value, uint8_t num_bits)
+{
+    // if (num_bits > 8) num_bits = 8;
+    uint8_t read_value = 0;
+
+    for (uint8_t i = 0; i < num_bits; i++) {
+        if (mpsse_state.cur_cmd.b.lendian) {
+            // NOTE: for little endian, bits are written to bit 7, then shifted down
+            read_value >>= 1;
+            if (mpsse_state.swd_mode)
+                read_value |= mpsse_swd_send_bit((value >> i) & 0x01) << 7;
+            else
+                read_value |= mpsse_send_bit((value >> i) & 0x01) << 7;
+        } else {
+            if (mpsse_state.swd_mode)
+                read_value |= mpsse_swd_send_bit((value >> (7 - i)) & 0x01) << (7 - i);
+            else
+                read_value |= mpsse_send_bit((value >> (7 - i)) & 0x01) << (7 - i);
+        }
     }
+    return read_value;
+}
+
+// send 1 byte over TDI/TDO
+uint8_t mpsse_send_byte(uint8_t value)
+{
+    return mpsse_send_bits(value, 8);
+}
+
+/*
+Send/read one bit on TMS
+
+Works the same as the normal bit send except writes on TMS
+*/
+uint8_t mpsse_tms_bit_send(uint8_t value)
+{
+    value &= 0x01;
+    uint8_t read_value = 0;
+    uint32_t dpin;
+
+    dpin = MPSSE_TMS_GPIO;
+
+    if (value) {
+        gpio_set_pin_high(dpin);
+    } else {
+        gpio_set_pin_low(dpin);
+    }
+
+    //setup delay
+    volatile uint8_t i = 0;
+
+    read_value = gpio_pin_is_high(dpin);
+
+    gpio_toggle_pin(MPSSE_SCK_GPIO);
+
+    read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
 
     gpio_toggle_pin(MPSSE_SCK_GPIO);
 
@@ -419,14 +356,14 @@ uint8_t mpsse_tms_bit_send(uint8_t value)
 
 }
 
-// send up to 7 bits ? should be up to 8? unspecified by mpsse
+// send up to 7 bits over TMS
 uint8_t mpsse_tms_send(uint8_t value, uint8_t num_bits)
 {
     uint8_t read_value = 0;
     uint8_t i = 0;
 
-    // one bit is clocked output on TDI for some reason if there's 7 bits written
-    if ((num_bits == 7) && !SWD_MODE) { //in swd mode, send all bits on TMS
+    // bit 7 (if it's there) is sent out on the dout pin
+    if (num_bits == 7) {
         uint8_t bitval = 0;
         bitval = (value >> 7) & 0x01;
         if (bitval) {
@@ -439,283 +376,225 @@ uint8_t mpsse_tms_send(uint8_t value, uint8_t num_bits)
 
     // send the rest of the bits out on TMS
     // TODO: should this work like the normal rx with little endian?
+    // I don't think reads during TMS are typical, so hard to say
     for (; i < num_bits; i++) {
-        if (MPSSE_CUR_CMD & FTDI_LITTLE_ENDIAN) {
+        if (mpsse_state.cur_cmd.b.lendian) {
             read_value >> 1;
             read_value |= mpsse_tms_bit_send((value >> i) & 0x01) << (7 - i);
-            // read_value |= mpsse_tms_bit_send((value >> i) & 0x01) << (i);
         } else {
             read_value |= mpsse_tms_bit_send((value >> (7 - i)) & 0x01) << (7 - i);
         }
 
     }
-    // if (MPSSE_SCK_IDLE_LEVEL)
-    //     gpio_toggle_pin(MPSSE_SCK_GPIO);
 	return read_value;
 }
 
+/*
+Handle all MPSSE transmissions
+
+Sends/receives 1 byte at a time, but may return early if we're at
+the end of the buffer and need more data
+*/
 void mpsse_handle_transmission(void)
 {
     uint8_t read_val = 0;
-    if (MPSSE_TRANSMISSION_LEN == 0) { 
+    if (mpsse_state.txn_len == 0) { 
         // not currently doing a transmission
         /*
         Always need at least 2 more bytes here
         For byte tx/rx, both used for tx/rx len
         For bit tx/rx, first is num bits, second is data
+
+        NOTE: Technically bit reads only need 1 byte, so could cause issues here
         */
         if (mpsse_tx_buffer_remaining() < 2) {
-            MPSSE_TX_REQ = 1;
+            mpsse_state.tx_req = 1;
             return; //need more data
         }
 
         // read length in
-        MPSSE_TRANSMISSION_LEN = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
+        mpsse_state.txn_len = MPSSE_TX_BUFFER[mpsse_state.tx_idx++];
 
-        if (!(MPSSE_CUR_CMD & FTDI_BIT_MODE)) {
+        if (!mpsse_state.cur_cmd.b.bit_mode) {
             // clock in high byte of length if in byte mode
-            MPSSE_TRANSMISSION_LEN |= MPSSE_TX_BUFFER[MPSSE_TX_IDX++] << 8;
-            MPSSE_FIRST_BIT = 1;
-            MPSSE_TRANSMISSION_LEN++; //0x00 sends 1 byte, 0x01 sends 2, etc
+            mpsse_state.txn_len |= MPSSE_TX_BUFFER[mpsse_state.tx_idx++] << 8;
+            mpsse_state.txn_len++; //0x00 sends 1 byte, 0x01 sends 2, etc
         } else {
 
             // take care of bit transmission right now
-            MPSSE_TRANSMISSION_LEN++; //0x00 sends 1 bit
-            if (MPSSE_CUR_CMD & FTDI_WRITE_TMS) {
-                read_val = mpsse_tms_send(MPSSE_TX_BUFFER[MPSSE_TX_IDX++], MPSSE_TRANSMISSION_LEN);
-                MPSSE_TRANSMISSION_LEN = 0;
+            mpsse_state.txn_len++; //0x00 sends 1 bit
+            if (mpsse_state.cur_cmd.b.wtms) {
+                read_val = mpsse_tms_send(MPSSE_TX_BUFFER[mpsse_state.tx_idx++], mpsse_state.txn_len);
+                mpsse_state.txn_len = 0;
             } else {
-                // need TDI valid before we start clocking
                 uint8_t value = 0;
-                if (MPSSE_CUR_CMD & FTDI_WRITE_TDI)
-                     value = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
+                if (mpsse_state.cur_cmd.b.wtdi) // if we're writing, read a byte from the buffer
+                     value = MPSSE_TX_BUFFER[mpsse_state.tx_idx++];
 
-                read_val = mpsse_send_bits(value, MPSSE_TRANSMISSION_LEN);
+                read_val = mpsse_send_bits(value, mpsse_state.txn_len);
             }
 
             // bit send done
-            MPSSE_TRANSMISSION_LEN = 0;
+            mpsse_state.txn_len = 0;
 
             // if a read was requested on the bit transmission
-            if (MPSSE_CUR_CMD & FTDI_READ_TDO) {
-                MPSSE_RX_BUFFER[MPSSE_RX_BYTES++] = read_val; // put TDO data into RX buf
+            if (mpsse_state.cur_cmd.b.rtdo) {
+                MPSSE_RX_BUFFER[mpsse_state.rx_bytes++] = read_val; // put TDO data into RX buf
                 if (mpsse_rx_buffer_remaining() > 0) {
                 } else {
                     // if we've got no more room in the RX buffer, send stuff back to openocd
-                    MPSSE_TRANSACTION_LOCK = 1;
+                    mpsse_state.txn_lock = 1;
                     udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, 
                         sizeof(MPSSE_RX_BUFFER), mpsse_vendor_bulk_in_received);
                 }
             }
-            MPSSE_CUR_CMD = 0;
+            mpsse_state.cur_cmd.u8 = 0;
             return;
         }
     }
 
+    // Now that the transaction length is known, we can start writing bytes
     // need at least one byte to send
+
+    // TMS not available for byte write
     if (mpsse_tx_buffer_remaining() < 1) {
-        MPSSE_TX_REQ = 1;
+        mpsse_state.tx_req = 1;
         return;
     }
 
-    if (MPSSE_CUR_CMD & (FTDI_WRITE_TDI)) {
-        if ((!MPSSE_LOOPBACK_ENABLED) && MPSSE_FIRST_BIT) {
-            // data needs to be valid before we start clocking
-            // uint8_t value = (MPSSE_TX_BUFFER[MPSSE_TX_IDX]);
-            // uint8_t bit = 0;
-            // if (MPSSE_CUR_CMD & FTDI_LITTLE_ENDIAN) {
-            //     bit = value & 0x01;
-            // } else {
-            //     bit = value & 0x80;
-            // }
-
-            // if (bit) {
-            //     gpio_set_pin_high(MPSSE_DOUT_GPIO);
-            // } else {
-            //     gpio_set_pin_low(MPSSE_DOUT_GPIO);
-            // }
-
-            // if (MPSSE_SCK_IDLE_LEVEL)
-            //     gpio_toggle_pin(MPSSE_SCK_GPIO);
-
-            MPSSE_FIRST_BIT = 0;
-        }
-
-        // do the rest of the read
-        read_val = mpsse_send_byte(MPSSE_TX_BUFFER[MPSSE_TX_IDX++]);
+    if (mpsse_state.cur_cmd.b.wtdi) {
+        read_val = mpsse_send_byte(MPSSE_TX_BUFFER[mpsse_state.tx_idx++]);
     } else {
         // if no write was requested, just send out 0's
-        // if (MPSSE_SCK_IDLE_LEVEL)
-        //     gpio_toggle_pin(MPSSE_SCK_GPIO);
         read_val = mpsse_send_byte(0);
     }
 
-    if (MPSSE_CUR_CMD & FTDI_READ_TDO) {
-        MPSSE_RX_BUFFER[MPSSE_RX_BYTES++] = read_val; //TDO data into RX buffer
+    if (mpsse_state.cur_cmd.b.rtdo) {
+        MPSSE_RX_BUFFER[mpsse_state.rx_bytes++] = read_val; //TDO data into RX buffer
         if (mpsse_rx_buffer_remaining() > 0) {
         } else {
             // if at end of buffer, send stuff back to the PC
-            MPSSE_TRANSACTION_LOCK = 1;
+            mpsse_state.txn_lock = 1;
             udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, 
                 sizeof(MPSSE_RX_BUFFER), mpsse_vendor_bulk_in_received);
         } 
     }
 
     // decrement data left in transmission
-    if (--MPSSE_TRANSMISSION_LEN == 0) {
+    if (--mpsse_state.txn_len == 0) {
         // if at the end of the transmission, do the next command
-        MPSSE_CUR_CMD = 0;
-        // if (MPSSE_SCK_IDLE_LEVEL)
-        //     gpio_toggle_pin(MPSSE_SCK_GPIO);
+        mpsse_state.cur_cmd.u8 = 0;
 
     }
 
 }
 
+/*
+Handle special (aka non transmission related) commands
+*/
 void mpsse_handle_special(void)
 {
     uint8_t value = 0;
     uint8_t direction = 0;
-    switch (MPSSE_CUR_CMD) {
+    switch (mpsse_state.cur_cmd.u8) {
+    // GPIO setup commands
     case FTDI_SET_OPLB:
         // need a byte for IO direction and IO value
         if (mpsse_tx_buffer_remaining() < 2) {
-            MPSSE_TX_REQ = 1;
-            return; //need to read more data in
+            mpsse_state.tx_req = 1;
+            return;
         }
-        value = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
-        direction = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
+
+        value = MPSSE_TX_BUFFER[mpsse_state.tx_idx++];
+        direction = MPSSE_TX_BUFFER[mpsse_state.tx_idx++];
 
         // configure IO pins
         for (uint8_t i = 0; i < 8; i++) {
-            if (!MPSSE_PINS_GPIO[i])
+            if (!mpsse_state.pins[i])
                 continue;
             if (direction & (1 << i)) {
-				if (value & (1 << i) || (!SWD_MODE)) {
-					gpio_configure_pin(MPSSE_PINS_GPIO[i], PIO_OUTPUT_1);
-                    if (i == 0)
-                        MPSSE_SCK_IDLE_LEVEL = 1;
+				if (value & (1 << i) || (!mpsse_state.swd_mode)) {
+					gpio_configure_pin(mpsse_state.pins[i], PIO_OUTPUT_1);
+                    if (i == 0) 
+                        gpio_toggle_pin(mpsse_state.pins[0]); //ignore idle high clock
+                        
 				} else {
-					gpio_configure_pin(MPSSE_PINS_GPIO[i], PIO_OUTPUT_0);
-                    if (i == 0)
-                        MPSSE_SCK_IDLE_LEVEL = 0;
+					gpio_configure_pin(mpsse_state.pins[i], PIO_OUTPUT_0);
 				}
             } else {
-                gpio_configure_pin(MPSSE_PINS_GPIO[i], PIO_INPUT);
+                gpio_configure_pin(mpsse_state.pins[i], PIO_INPUT);
             }
         }
 
-        if (MPSSE_SCK_IDLE_LEVEL) {
-            gpio_toggle_pin(MPSSE_PINS_GPIO[0]); //no
-        }
-        // FPGA_releaselock();
-        // while(!FPGA_setlock(fpga_generic));
-        // FPGA_setaddr(ADDR_IOROUTE);
-        // uint8_t gpio_state[8];
-        // memcpy(gpio_state, xram, 8);
-        // if (direction & (1 << 6)) {
-        //     gpio_state[6] |= 1 << 0;
-        //     if (value & (1 << 6)) {
-        //         gpio_state[6] |= 1 << 1;
-        //     } else {
-        //         gpio_state[6] &= ~(1 << 1);
-        //     }
-        // } else {
-        //     gpio_state[6] &= ~(1 << 0);
-        // }
-
-        // FPGA_setaddr(ADDR_IOROUTE);
-        // memcpy(xram, gpio_state, 8);
-        // FPGA_releaselock();
-        MPSSE_CUR_CMD = 0x00;
+        mpsse_state.cur_cmd.u8 = 0x00;
         break;
     case FTDI_SET_OPHB:
-        // we don't support these IO pins, so just ignore command
-        // still need to read bytes though
+        // Special "IO" for enabling SWD and SWD output
         if (mpsse_tx_buffer_remaining() < 2) {
-            MPSSE_TX_REQ = 1;
+            mpsse_state.tx_req = 1;
             return; //need to read more data in
         }
-        MPSSE_CUR_CMD = 0x00;
-        value = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
-        direction = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
+
+        mpsse_state.cur_cmd.u8 = 0x00;
+        value = MPSSE_TX_BUFFER[mpsse_state.tx_idx++];
+        direction = MPSSE_TX_BUFFER[mpsse_state.tx_idx++];
 
         #if MPSSE_SWD_SUPPORT
         if ((value & 1)) {
             // special SWD enable case
-            SWD_MODE = 1;
+            mpsse_state.swd_mode = 1;
             if (value & 2) {
-                if (!SWD_OUTPUT_EN) {
-                    // do an extra clock on input -> output transition
-                    // gpio_toggle_pin(MPSSE_SCK_GPIO);
-                    // volatile uint8_t i = 0;
-                    // i = 0;
-                    // gpio_toggle_pin(MPSSE_SCK_GPIO);
-                    // i = 0;
-                }
-                // gpio_toggle_pin(MPSSE_SCK_GPIO);
-                // i = 0;
-                // gpio_toggle_pin(MPSSE_SCK_GPIO);
-                SWD_OUTPUT_EN = 1;
-                gpio_configure_pin(MPSSE_PINS_GPIO[3], PIO_OUTPUT_1);
+                mpsse_state.swd_out_en = 1;
+                gpio_configure_pin(mpsse_state.pins[3], PIO_OUTPUT_1);
             } else {
-                gpio_configure_pin(MPSSE_PINS_GPIO[3], PIO_INPUT);
-                if (SWD_OUTPUT_EN) {
-                    // do an extra clock on input -> output transition
-                    // gpio_toggle_pin(MPSSE_SCK_GPIO);
-                    // volatile uint8_t i = 0;
-                    // i = 0;
-                    // gpio_toggle_pin(MPSSE_SCK_GPIO);
-                    // i = 0;
-                }
-                // gpio_configure_pin(MPSSE_PINS_GPIO[3], PIO_INPUT);
-                SWD_OUTPUT_EN = 0;
+                gpio_configure_pin(mpsse_state.pins[3], PIO_INPUT);
+                mpsse_state.swd_out_en = 0;
             }
         } else {
-            SWD_MODE = 0;
+            mpsse_state.swd_mode = 0;
         }
         #endif
         break;
     case FTDI_READ_IPLB:
         // ignore
-        MPSSE_CUR_CMD = 0x00;
+        mpsse_state.cur_cmd.u8 = 0x00;
         MPSSE_RX_BUFFER[2] = 0x00;
-        MPSSE_RX_BYTES = 3;
-        MPSSE_TRANSACTION_LOCK = 1;
-        udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, MPSSE_RX_BYTES, mpsse_vendor_bulk_in_received);
+        mpsse_state.rx_bytes = 3;
+        mpsse_state.txn_lock = 1;
+        udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, mpsse_state.rx_bytes, mpsse_vendor_bulk_in_received);
         break;
     case FTDI_READ_IPHB:
         // ignore
-        MPSSE_CUR_CMD = 0x00;
+        mpsse_state.cur_cmd.u8 = 0x00;
         MPSSE_RX_BUFFER[2] = 0x01;
-        MPSSE_RX_BYTES = 3;
-        MPSSE_TRANSACTION_LOCK = 1;
-        udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, MPSSE_RX_BYTES, mpsse_vendor_bulk_in_received);
+        mpsse_state.rx_bytes = 3;
+        mpsse_state.txn_lock = 1;
+        udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, mpsse_state.rx_bytes, mpsse_vendor_bulk_in_received);
         break;
     case FTDI_EN_LOOPBACK:
-        MPSSE_LOOPBACK_ENABLED = 1;
-        MPSSE_CUR_CMD = 0x00;
+        mpsse_state.loopback_en = 1;
+        mpsse_state.cur_cmd.u8 = 0x00;
         break;
     case FTDI_DIS_LOOPBACK:
-        MPSSE_LOOPBACK_ENABLED = 0;
-        MPSSE_CUR_CMD = 0x00;
+        mpsse_state.loopback_en = 0;
+        mpsse_state.cur_cmd.u8 = 0x00;
         break;
     case FTDI_SEND_IMM:
         // send the rest of the data back to openocd
-        MPSSE_TRANSACTION_LOCK = 1;
-        MPSSE_CUR_CMD = 0x00;
-        udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, MPSSE_RX_BYTES, mpsse_vendor_bulk_in_received);
+        mpsse_state.txn_lock = 1;
+        mpsse_state.cur_cmd.u8 = 0x00;
+        udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, mpsse_state.rx_bytes, mpsse_vendor_bulk_in_received);
         break;
     case 0x86:
-        // some clock command
-        MPSSE_TX_IDX += 2;
-        MPSSE_CUR_CMD = 0x00;
+        // some clock command, ignore
+        mpsse_state.tx_idx += 2;
+        mpsse_state.cur_cmd.u8 = 0x00;
         break;
     case 0x8A:
-        MPSSE_CUR_CMD = 0x00;
+        mpsse_state.cur_cmd.u8 = 0x00;
         break;
     default:
-        MPSSE_CUR_CMD = 0x00;
+        mpsse_state.cur_cmd.u8 = 0x00;
         break;
     }
 }
@@ -727,52 +606,54 @@ void mpsse_vendor_bulk_out_received(udd_ep_status_t status,
     // we just receive stuff here, then handle in main()
     if (UDD_EP_TRANSFER_OK != status) {
         // restart
-        if (MPSSE_TX_REQ) {
+        if (mpsse_state.tx_req) {
             udd_ep_run(UDI_MPSSE_EP_BULK_OUT, 0, MPSSE_TX_BUFFER_BAK, 
                 sizeof(MPSSE_TX_BUFFER_BAK), mpsse_vendor_bulk_out_received);
 
         }
         udd_ep_run(UDI_MPSSE_EP_BULK_OUT, 0, MPSSE_TX_BUFFER, 
             sizeof(MPSSE_TX_BUFFER_BAK), mpsse_vendor_bulk_out_received);
-        MPSSE_TRANSACTION_LOCK = 1;
+        mpsse_state.txn_lock = 1;
         return;
     }
 
-    if (MPSSE_TX_REQ) {
+    if (mpsse_state.tx_req) {
         // we read into the backup buffer, move the data over to the usual one
         // extra room in the normal buffer so we always read the same amount
+
+        // reading unususal sizes breaks USB, so don't change this
         for (uint16_t i = 0; i < nb_transfered; i++) {
             MPSSE_TX_BUFFER[i + mpsse_tx_buffer_remaining()] = MPSSE_TX_BUFFER_BAK[i];
         }
-        MPSSE_TX_BYTES = mpsse_tx_buffer_remaining() + nb_transfered;
+        mpsse_state.tx_bytes = mpsse_tx_buffer_remaining() + nb_transfered;
     } else {
-        MPSSE_TX_BYTES = nb_transfered;
+        mpsse_state.tx_bytes = nb_transfered;
     }
-    MPSSE_TX_REQ = 0;
-    MPSSE_TX_IDX = 0;
-    MPSSE_TRANSACTION_LOCK = 0;
+    mpsse_state.tx_req = 0;
+    mpsse_state.tx_idx = 0;
+    mpsse_state.txn_lock = 0;
 }
 
 void mpsse_vendor_bulk_in_received(udd_ep_status_t status, iram_size_t nb_transferred, udd_ep_id_t ep)
 {
     if (UDD_EP_TRANSFER_OK != status) {
-        udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, MPSSE_RX_BYTES, mpsse_vendor_bulk_in_received);
+        udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, mpsse_state.rx_bytes, mpsse_vendor_bulk_in_received);
         return;
     }
-    for (uint16_t i = 0; i < (MPSSE_RX_BYTES - nb_transferred); i++) {
+    for (uint16_t i = 0; i < (mpsse_state.rx_bytes - nb_transferred); i++) {
         // if we haven't finished sending, move the rest of the stuff to the start of the buffer
         MPSSE_RX_BUFFER[i] = MPSSE_RX_BUFFER[nb_transferred + i];
     }
-    MPSSE_RX_BYTES -= nb_transferred;
+    mpsse_state.rx_bytes -= nb_transferred;
     
-    if (MPSSE_RX_BYTES) {
-        udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, MPSSE_RX_BYTES, mpsse_vendor_bulk_in_received);
+    if (mpsse_state.rx_bytes) {
+        udd_ep_run(UDI_MPSSE_EP_BULK_IN, 0, MPSSE_RX_BUFFER, mpsse_state.rx_bytes, mpsse_vendor_bulk_in_received);
     } else {
         // always have 2 bytes for status
-        MPSSE_RX_BYTES = 2;
+        mpsse_state.rx_bytes = 2;
         MPSSE_RX_BUFFER[0] = 0x00;
         MPSSE_RX_BUFFER[1] = 0x00;
-        MPSSE_TRANSACTION_LOCK = 0;
+        mpsse_state.txn_lock = 0;
     }
 
 }
@@ -787,20 +668,24 @@ void mpsse_register_handlers(void)
 // TODO: if we need to implement adaptive clock, should do in a GPIO based ISR I think?
 void MPSSE_main_sendrecv_byte(void)
 {
-	if (!MPSSE_ENABLED) return;
+	if (!mpsse_state.enabled) return;
 
-    if (MPSSE_TRANSACTION_LOCK) {
-        // current doing a send back to PC, so wait until that's done
+    if (mpsse_state.txn_lock) {
+        // waiting on a USB transaction to/from the PC, so wait for that to be done
+        // before doing anything else
         return;
     }
 
-    if (MPSSE_TX_REQ) {
+    if (mpsse_state.tx_req) {
+        // If here, we tried to process a command, but were at the end
+        // of the buffer and need more data.
+
         // command split between USB transactions,
         // so move unused data back to start and read more in
         for (uint16_t i = 0; i < (mpsse_tx_buffer_remaining()); i++) {
-            MPSSE_TX_BUFFER[i] = MPSSE_TX_BUFFER[i+MPSSE_TX_IDX];
+            MPSSE_TX_BUFFER[i] = MPSSE_TX_BUFFER[i+mpsse_state.tx_idx];
         }
-        MPSSE_TRANSACTION_LOCK = 1;
+        mpsse_state.txn_lock = 1;
         udd_ep_run(UDI_MPSSE_EP_BULK_OUT, 0, 
             MPSSE_TX_BUFFER_BAK, sizeof(MPSSE_TX_BUFFER_BAK), 
             mpsse_vendor_bulk_out_received);
@@ -809,17 +694,18 @@ void MPSSE_main_sendrecv_byte(void)
 
     // we're at end of the TX buffer, so read more in
     if (mpsse_tx_buffer_remaining() <= 0) {
-        MPSSE_TRANSACTION_LOCK = 1;
+        mpsse_state.txn_lock = 1;
         udd_ep_run(UDI_MPSSE_EP_BULK_OUT, 0, MPSSE_TX_BUFFER, sizeof(MPSSE_TX_BUFFER_BAK), mpsse_vendor_bulk_out_received);
         return;
     }
 
-    if (MPSSE_CUR_CMD == 0x00) {
-        MPSSE_CUR_CMD = MPSSE_TX_BUFFER[MPSSE_TX_IDX++];
-        NUM_PROCESSED_CMDS++;
+    // finished processing the last command, so read a new one
+    if (mpsse_state.cur_cmd.u8 == 0x00) {
+        mpsse_state.cur_cmd.u8 = MPSSE_TX_BUFFER[mpsse_state.tx_idx++];
+        mpsse_state.n_processed_cmds++;
     }
 
-    if (MPSSE_CUR_CMD & 0x80) {
+    if (mpsse_state.cur_cmd.b.special) {
         mpsse_handle_special();
     } else {
         mpsse_handle_transmission();

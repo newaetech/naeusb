@@ -1100,7 +1100,7 @@ bool udc_process_setup(void)
 
 	// MS requests this using request type 0xC0 and our user defined bRequest (0x01 in our case)
 	if ((udd_g_ctrlreq.req.bmRequestType == 0xC0) && (udd_g_ctrlreq.req.bRequest == 0x01)) {
-		if (!MPSSE_ENABLED) {
+		if (!mpsse_enabled()) {
 			MS_OS_DESC.FUNC[1].FEAT.CompatibleID[0] = 'M';
 		} else {
 			MS_OS_DESC.FUNC[1].FEAT.CompatibleID[0] = 'W';
