@@ -40,6 +40,11 @@ void openadc_progfpga_bulk(void){
         if (udd_g_ctrlreq.req.wLength == 4) {
             prog_freq = *(CTRLBUFFER_WORDPTR);
         }
+
+        //nRST gets passed through on FPGA as well, we set this high and hope that is
+        //correct for target.
+        gpio_configure_pin(PIN_TARG_NRST_GPIO, (PIO_TYPE_PIO_OUTPUT_1 | PIO_DEFAULT));
+        gpio_set_pin_high(PIN_TARG_NRST_GPIO);
         fpga_program_spi_setup1(prog_freq);
         break;
 
@@ -50,6 +55,8 @@ void openadc_progfpga_bulk(void){
     case 0xB2:
         /* Done */
         blockendpoint_usage = bep_emem;
+        //Can't set this back to input until after FPGA stops listening, for now we ignore it
+        //gpio_configure_pin(PIN_TARG_NRST_GPIO, (PIO_TYPE_PIO_INPUT | PIO_DEFAULT));
         break;
     default:
         break;

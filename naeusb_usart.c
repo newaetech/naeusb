@@ -37,6 +37,10 @@
 #include "usb_protocol_cdc.h"
 #include "naeusb_usart.h"
 
+#ifdef CW_TARGET_SPI
+#include "targetspi.h"
+#endif
+
 #ifdef CW_PROG_XMEGA
 #include "XPROGNewAE.h"
 #endif
@@ -60,6 +64,106 @@ bool naeusb_cdc_settings_in(void);
 void naeusb_cdc_settings_out(void);
 
 void generic_isr(usart_driver *driver);
+
+#ifdef CW_TARGET_SPI
+
+void spi1util_init(uint32_t prog_freq)
+{
+    spi_enable_clock(SPI);
+	spi_reset(SPI);
+	spi_set_master_mode(SPI);
+	spi_disable_mode_fault_detect(SPI);
+	spi_disable_loopback(SPI);
+
+	spi_set_clock_polarity(SPI, 0, 0);
+	spi_set_clock_phase(SPI, 0, 1);
+	spi_set_baudrate_div(SPI, 0, spi_calc_baudrate_div(prog_freq, sysclk_get_cpu_hz()));
+
+	spi_enable(SPI);
+
+	gpio_configure_pin(SPI_MOSI_GPIO, SPI_MOSI_FLAGS);
+	gpio_configure_pin(SPI_SPCK_GPIO, SPI_SPCK_FLAGS);
+	gpio_configure_pin(SPI_MISO_GPIO, SPI_MISO_FLAGS);
+}
+
+void spi1util_deinit(void)
+{
+    ;
+}
+
+static uint8_t spi1util_data_buffer[64];
+static int spi1util_databuffer_len = 0;
+
+uint8_t spi1util_xferbyte(uint8_t b){
+    uint16_t data = b;
+    uint8_t ignored;
+    spi_write(SPI, data, 0, 0);
+    spi_read(SPI, &data, &ignored);
+    return data;
+}
+
+/* TODO - Move following into seperate file? Maybe remove this from naeusb_fpga_target.c too then */
+static void ctrl_spi1util(void){
+	
+    uint32_t prog_freq = 100E3;
+	switch(udd_g_ctrlreq.req.wValue){
+		case 0xA0:
+            if (udd_g_ctrlreq.req.wLength == 4) {
+                prog_freq = *(CTRLBUFFER_WORDPTR);
+            }
+			spi1util_init(prog_freq);			
+			break;
+			
+		case 0xA1:
+			spi1util_deinit();
+			break;
+			
+		case 0xA2: //Not implemented here, done via Python GPIO
+			//spi1util_cs_low();
+			break;
+
+		case 0xA3: //Not implemented here, done via Python GPIO
+			//spi1util_cs_high();
+			break;
+
+		case 0xA4:
+			//Catch heartbleed-style error
+			if (udd_g_ctrlreq.req.wLength > udd_g_ctrlreq.payload_size){
+				return;
+			}
+
+			if (udd_g_ctrlreq.req.wLength > sizeof(spi1util_data_buffer)){
+				return;
+			}
+			spi1util_databuffer_len = udd_g_ctrlreq.req.wLength;
+			for (int i = 0; i < udd_g_ctrlreq.req.wLength; i++){
+				spi1util_data_buffer[i] = spi1util_xferbyte(udd_g_ctrlreq.payload[i]);
+			}
+
+			break;
+        
+        case 0xA5:
+            //nrst low (required due to sharing of nRST/SPI mode with programming)
+            gpio_configure_pin(PIN_TARG_NRST_GPIO, (PIO_TYPE_PIO_OUTPUT_0 | PIO_DEFAULT));
+            gpio_set_pin_low(PIN_TARG_NRST_GPIO);
+            break;
+        
+        case 0xA6:
+            //nrst high (required due to sharing of nRST/SPI mode with programming)
+            gpio_configure_pin(PIN_TARG_NRST_GPIO, (PIO_TYPE_PIO_OUTPUT_1 | PIO_DEFAULT));
+            gpio_set_pin_high(PIN_TARG_NRST_GPIO);
+            break;
+        
+        case 0xA7:
+            //nrst high-z (required due to sharing of nRST/SPI mode with programming)
+            gpio_configure_pin(PIN_TARG_NRST_GPIO, (PIO_TYPE_PIO_INPUT | PIO_DEFAULT));
+            break;
+
+		default:
+			break;
+	}
+}
+#endif
 
 
 #ifdef CW_USE_USART0
@@ -570,6 +674,13 @@ bool usart_setup_out_received(void)
     case REQ_USART0_DATA:
         udd_g_ctrlreq.callback = ctrl_usart_cb_data;
         return true;
+    
+#ifdef CW_TARGET_SPI
+    /* Target SPI1 */
+    case REQ_FPGASPI1_XFER:
+        udd_g_ctrlreq.callback = ctrl_spi1util;
+        return true;
+#endif
 #ifdef CW_PROG_XMEGA
     case REQ_XMEGA_PROGRAM:
         /*
@@ -613,6 +724,18 @@ bool usart_setup_in_received(void)
         return true;
         break;
 		
+#ifdef CW_TARGET_SPI
+        case REQ_FPGASPI1_XFER:
+            if (udd_g_ctrlreq.req.wLength > sizeof(spi1util_data_buffer))
+            {
+                return false;
+            }
+            udd_g_ctrlreq.payload = spi1util_data_buffer;
+            udd_g_ctrlreq.payload_size = udd_g_ctrlreq.req.wLength;
+            return true;
+        break;
+#endif
+
 #ifdef CW_PROG_XMEGA
     case REQ_XMEGA_PROGRAM:
         return XPROGProtocol_Command();

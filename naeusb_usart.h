@@ -7,6 +7,9 @@
 #define REQ_AVR_PROGRAM 0x21
 #define REQ_CDC_SETTINGS_EN 0x31
 
+/* Target/Extra SPI Transfer */
+#define REQ_FPGASPI1_XFER 0x35
+
 typedef struct {
 	Usart * usart;
 	sam_usart_opt_t usartopts;
