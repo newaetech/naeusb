@@ -489,9 +489,6 @@ void mpsse_handle_transmission(void)
 
 }
 
-/*
-Handle special (aka non transmission related) commands
-*/
 void mpsse_handle_special(void)
 {
     uint8_t value = 0;
@@ -526,6 +523,13 @@ void mpsse_handle_special(void)
             }
         }
 
+        #ifdef MPSSE_TMS_WR
+        gpio_configure_pin(MPSSE_TMS_WR, PIO_OUTPUT_1);
+        #endif
+        #ifdef MPSSE_TRST_WR
+        gpio_configure_pin(MPSSE_TRST_WR, PIO_OUTPUT_1);
+        #endif
+
         mpsse_state.cur_cmd.u8 = 0x00;
         break;
     case FTDI_SET_OPHB:
@@ -546,9 +550,15 @@ void mpsse_handle_special(void)
             if (value & 2) {
                 mpsse_state.swd_out_en = 1;
                 gpio_configure_pin(mpsse_state.pins[3], PIO_OUTPUT_1);
+                #ifdef MPSSE_TMS_WR
+                gpio_configure_pin(MPSSE_TMS_WR, PIO_OUTPUT_1);
+                #endif
             } else {
                 gpio_configure_pin(mpsse_state.pins[3], PIO_INPUT);
                 mpsse_state.swd_out_en = 0;
+                #ifdef MPSSE_TMS_WR
+                gpio_configure_pin(MPSSE_TMS_WR, PIO_OUTPUT_0);
+                #endif
             }
         } else {
             mpsse_state.swd_mode = 0;
