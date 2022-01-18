@@ -67,6 +67,30 @@ void generic_isr(usart_driver *driver);
 
 #ifdef CW_TARGET_SPI
 
+void spi1util_toggleclk(uint8_t cycles, bool mosi_status)
+{
+    if (mosi_status){
+        gpio_set_pin_high(SPI_MOSI_GPIO);
+        gpio_configure_pin(SPI_MOSI_GPIO, (PIO_TYPE_PIO_OUTPUT_1 | PIO_DEFAULT));
+    } else {
+        gpio_set_pin_low(SPI_MOSI_GPIO);
+        gpio_configure_pin(SPI_MOSI_GPIO, (PIO_TYPE_PIO_OUTPUT_0 | PIO_DEFAULT));
+    }
+    gpio_set_pin_low(SPI_SPCK_GPIO);
+	gpio_configure_pin(SPI_SPCK_GPIO, (PIO_TYPE_PIO_OUTPUT_0 | PIO_DEFAULT));
+
+    while(cycles--){
+        gpio_set_pin_low(SPI_SPCK_GPIO);
+        delay_cycles(1);
+        gpio_set_pin_high(SPI_SPCK_GPIO);
+        delay_cycles(1);
+        gpio_set_pin_low(SPI_SPCK_GPIO);
+    }
+    
+	gpio_configure_pin(SPI_MOSI_GPIO, SPI_MOSI_FLAGS);
+	gpio_configure_pin(SPI_SPCK_GPIO, SPI_SPCK_FLAGS);
+}
+
 void spi1util_init(uint32_t prog_freq)
 {
     spi_enable_clock(SPI);
@@ -157,6 +181,13 @@ static void ctrl_spi1util(void){
         case 0xA7:
             //nrst high-z (required due to sharing of nRST/SPI mode with programming)
             gpio_configure_pin(PIN_TARG_NRST_GPIO, (PIO_TYPE_PIO_INPUT | PIO_DEFAULT));
+            break;
+        
+        case 0xA8:
+            //Toggle SPCK pin as needed
+            if(udd_g_ctrlreq.req.wLength == 2){
+                spi1util_toggleclk(udd_g_ctrlreq.payload[0], udd_g_ctrlreq.payload[1]);
+            }
             break;
 
 		default:
