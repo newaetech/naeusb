@@ -154,6 +154,7 @@ bool mpsse_setup_out_received(void)
         gpio_configure_pin(MPSSE_DOUT_GPIO, PIO_OUTPUT_0);
         gpio_configure_pin(MPSSE_SCK_GPIO, PIO_OUTPUT_0);
         gpio_configure_pin(MPSSE_TMS_GPIO, PIO_OUTPUT_0);
+
         mpsse_state.enabled = 1;
 		mpsse_state.enabled = 1;
         mpsse_state.txn_lock = 1;
@@ -265,7 +266,7 @@ uint8_t mpsse_swd_send_bit(uint8_t value)
     uint32_t dpin;
 
     // actually do write
-    dpin = MPSSE_TMS_GPIO;
+    dpin = mpsse_state.pins[3];
 
     // this is really dumb
     if (mpsse_state.swd_out_en) {
@@ -523,12 +524,14 @@ void mpsse_handle_special(void)
             }
         }
 
-        #ifdef MPSSE_TMS_WR
-        gpio_configure_pin(MPSSE_TMS_WR, PIO_OUTPUT_1);
-        #endif
-        #ifdef MPSSE_TRST_WR
-        gpio_configure_pin(MPSSE_TRST_WR, PIO_OUTPUT_1);
-        #endif
+        if (!mpsse_state.swd_mode) {
+            #ifdef MPSSE_TMS_WR
+            gpio_configure_pin(MPSSE_TMS_WR, PIO_OUTPUT_1);
+            #endif
+            #ifdef MPSSE_TRST_WR
+            gpio_configure_pin(MPSSE_TRST_WR, PIO_OUTPUT_1);
+            #endif
+        }
 
         mpsse_state.cur_cmd.u8 = 0x00;
         break;
@@ -549,16 +552,26 @@ void mpsse_handle_special(void)
             mpsse_state.swd_mode = 1;
             if (value & 2) {
                 mpsse_state.swd_out_en = 1;
-                gpio_configure_pin(mpsse_state.pins[3], PIO_OUTPUT_1);
+                // hack since TX and RX pins aren't connected like on Lite
+                #if USB_DEVICE_PRODUCT_ID == 0xACE3
+                    mpsse_state.pins[3] = PIN_PDIDTX_GPIO;
+                #endif
                 #ifdef MPSSE_TMS_WR
                 gpio_configure_pin(MPSSE_TMS_WR, PIO_OUTPUT_1);
                 #endif
+                gpio_configure_pin(mpsse_state.pins[3], PIO_OUTPUT_1);
             } else {
-                gpio_configure_pin(mpsse_state.pins[3], PIO_INPUT);
-                mpsse_state.swd_out_en = 0;
+                //hack for Pro
+                #if USB_DEVICE_PRODUCT_ID == 0xACE3
+                    mpsse_state.pins[3] = PIN_PDIDRX_GPIO;
+                #endif
+                // gpio_configure_pin(mpsse_state.pins[3], PIO_OUTPUT_1);
                 #ifdef MPSSE_TMS_WR
                 gpio_configure_pin(MPSSE_TMS_WR, PIO_OUTPUT_0);
                 #endif
+
+                gpio_configure_pin(mpsse_state.pins[3], PIO_INPUT);
+                mpsse_state.swd_out_en = 0;
             }
         } else {
             mpsse_state.swd_mode = 0;
