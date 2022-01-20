@@ -152,6 +152,11 @@ SECTIONS
         _estack = .;
     } > ram
 
+    .mpssemem (NOLOAD) :
+    {
+        KEEP(*(.mpssemem))
+    } > ram
+
     . = ALIGN(4);
     _end = . ;
 }

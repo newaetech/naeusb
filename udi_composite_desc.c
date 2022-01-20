@@ -133,8 +133,11 @@ udi_api_t *mpsse_udi_apis[2] = {
 	.ep_bulk_out.bInterval             = 0,\
 	.ep_bulk_in.wMaxPacketSize         = LE16(UDI_VENDOR_EPS_SIZE_BULK_FS),\
 	.ep_bulk_out.wMaxPacketSize        = LE16(UDI_VENDOR_EPS_SIZE_BULK_FS),\
+
+	#ifdef USB_DEVICE_HS_SUPPORT
 	.ep_bulk_in.wMaxPacketSize         = LE16(UDI_VENDOR_EPS_SIZE_BULK_HS),\
 	.ep_bulk_out.wMaxPacketSize        = LE16(UDI_VENDOR_EPS_SIZE_BULK_HS),
+	#endif
 
 COMPILER_WORD_ALIGNED
 udc_desc_t udc_desc_fs_mpsse = {
@@ -249,8 +252,10 @@ void switch_configurations()
 {
 	udc_config.conf_lsfs->desc = (usb_conf_desc_t *)&udc_desc_fs_mpsse;
 	udc_config.conf_lsfs->udi_apis = mpsse_udi_apis;
+	#ifdef USB_DEVICE_HS_SUPPORT
 	udc_config.conf_hs->desc = (usb_conf_desc_t *)&udc_desc_hs_mpsse;
 	udc_config.conf_hs->udi_apis = mpsse_udi_apis;
+	#endif
 }
 #endif
 
