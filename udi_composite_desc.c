@@ -111,6 +111,8 @@ udi_api_t *mpsse_udi_apis[2] = {
 
 // #define  UDI_CDC_DATA_EP_IN_0          (5 | USB_EP_DIR_IN)  // TX
 // #define  UDI_CDC_DATA_EP_OUT_0         (6 | USB_EP_DIR_OUT) // RX
+
+#ifdef USB_DEVICE_HS_SUPPORT
 #define MPSSE_DESC \
 	.iface0.bLength            = sizeof(usb_iface_desc_t),\
 	.iface0.bDescriptorType    = USB_DT_INTERFACE,\
@@ -133,11 +135,32 @@ udi_api_t *mpsse_udi_apis[2] = {
 	.ep_bulk_out.bInterval             = 0,\
 	.ep_bulk_in.wMaxPacketSize         = LE16(UDI_VENDOR_EPS_SIZE_BULK_FS),\
 	.ep_bulk_out.wMaxPacketSize        = LE16(UDI_VENDOR_EPS_SIZE_BULK_FS),\
-
-	#ifdef USB_DEVICE_HS_SUPPORT
 	.ep_bulk_in.wMaxPacketSize         = LE16(UDI_VENDOR_EPS_SIZE_BULK_HS),\
 	.ep_bulk_out.wMaxPacketSize        = LE16(UDI_VENDOR_EPS_SIZE_BULK_HS),
-	#endif
+#else
+	.iface0.bLength            = sizeof(usb_iface_desc_t),\
+	.iface0.bDescriptorType    = USB_DT_INTERFACE,\
+	.iface0.bInterfaceNumber   = UDI_CDC_COMM_IFACE_NUMBER_0,\
+	.iface0.bAlternateSetting  = 0 /*1*/,\
+	.iface0.bNumEndpoints      = UDI_VENDOR_EP_NB,\
+	.iface0.bInterfaceClass    = VENDOR_CLASS,\
+	.iface0.bInterfaceSubClass = VENDOR_SUBCLASS,\
+	.iface0.bInterfaceProtocol = VENDOR_PROTOCOL,\
+	.iface0.iInterface         = UDI_VENDOR_STRING_ID,\
+	.ep_bulk_in.bLength                = sizeof(usb_ep_desc_t),\
+	.ep_bulk_in.bDescriptorType        = USB_DT_ENDPOINT,\
+	.ep_bulk_in.bEndpointAddress       = UDI_MPSSE_EP_BULK_IN,\
+	.ep_bulk_in.bmAttributes           = USB_EP_TYPE_BULK,\
+	.ep_bulk_in.bInterval              = 0,\
+	.ep_bulk_out.bLength               = sizeof(usb_ep_desc_t),\
+	.ep_bulk_out.bDescriptorType       = USB_DT_ENDPOINT,\
+	.ep_bulk_out.bEndpointAddress      = UDI_MPSSE_EP_BULK_OUT,\
+	.ep_bulk_out.bmAttributes          = USB_EP_TYPE_BULK,\
+	.ep_bulk_out.bInterval             = 0,\
+	.ep_bulk_in.wMaxPacketSize         = LE16(UDI_VENDOR_EPS_SIZE_BULK_FS),\
+	.ep_bulk_out.wMaxPacketSize        = LE16(UDI_VENDOR_EPS_SIZE_BULK_FS),
+#endif
+	
 
 COMPILER_WORD_ALIGNED
 udc_desc_t udc_desc_fs_mpsse = {
