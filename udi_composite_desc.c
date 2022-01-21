@@ -138,6 +138,7 @@ udi_api_t *mpsse_udi_apis[2] = {
 	.ep_bulk_in.wMaxPacketSize         = LE16(UDI_VENDOR_EPS_SIZE_BULK_HS),\
 	.ep_bulk_out.wMaxPacketSize        = LE16(UDI_VENDOR_EPS_SIZE_BULK_HS),
 #else
+#define MPSSE_DESC \
 	.iface0.bLength            = sizeof(usb_iface_desc_t),\
 	.iface0.bDescriptorType    = USB_DT_INTERFACE,\
 	.iface0.bInterfaceNumber   = UDI_CDC_COMM_IFACE_NUMBER_0,\
