@@ -363,15 +363,16 @@ uint8_t mpsse_tms_send(uint8_t value, uint8_t num_bits)
     uint8_t read_value = 0;
     uint8_t i = 0;
 
-    // bit 7 (if it's there) is sent out on the dout pin
+    // bit 7 is sent out on the dout pin
+    // only counts if sending 7 bits tho ;)
+    uint8_t bitval = 0;
+    bitval = (value >> 7) & 0x01;
+    if (bitval) {
+        gpio_set_pin_high(MPSSE_DOUT_GPIO);
+    } else {
+        gpio_set_pin_low(MPSSE_DOUT_GPIO);
+    }
     if (num_bits == 7) {
-        uint8_t bitval = 0;
-        bitval = (value >> 7) & 0x01;
-        if (bitval) {
-            gpio_set_pin_high(MPSSE_DOUT_GPIO);
-        } else {
-            gpio_set_pin_low(MPSSE_DOUT_GPIO);
-        }
         i++;
     }
 

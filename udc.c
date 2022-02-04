@@ -1100,9 +1100,13 @@ bool udc_process_setup(void)
 
 	// MS requests this using request type 0xC0 and our user defined bRequest (0x01 in our case)
 	if ((udd_g_ctrlreq.req.bmRequestType == 0xC0) && (udd_g_ctrlreq.req.bRequest == 0x01)) {
+
+		// Hack to apply WinUSB to interface 1 IFF mpsse is enabled
 		if (!mpsse_enabled()) {
+			// CompatibleID = "MINUSB"
 			MS_OS_DESC.FUNC[1].FEAT.CompatibleID[0] = 'M';
 		} else {
+			// CompatibleID = "WINUSB"
 			MS_OS_DESC.FUNC[1].FEAT.CompatibleID[0] = 'W';
 		}
 		udd_set_setup_payload((uint8_t *)&MS_OS_DESC, sizeof(struct MS_OS_DESC_SET_HEADER));

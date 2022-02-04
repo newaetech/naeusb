@@ -110,9 +110,13 @@ struct MS_OS_DESC_SET_HEADER {
     uint8_t wDescriptorType[2];  // 0x0000
     uint8_t dwWindowsVersion[4]; //0x06030000
     uint8_t wTotalLength[2]; //sizeof(struct MS_OS_DESC_SET_HEADER) including MS_FUNC_SUBSET_HEADER
-    struct MS_FUNC_SUBSET_HEADER FUNC; // the rest of the header
+    struct MS_FUNC_SUBSET_HEADER FUNC[N]; // the rest of the header
 };
 ```
+
+where N is the number of interfaces you want to apply the WinUSB driver to, which may differ
+from the total number of interfaces that your device has. For example, if you have 2 vendor interfaces
+that you want to apply the WinUSB driver to and 1 CDC interface, N=2.
 
 ### Function Subset Header
 
@@ -125,12 +129,15 @@ interface (aka which interface the WINUSB driver should be used for):
 struct MS_FUNC_SUBSET_HEADER {
     uint8_t wLength[2]; // 0x08
     uint8_t wDescriptorType[2]; //0x02
-    uint8_t bFirstInterface; // 0x00
+    uint8_t bFirstInterface; // interface number
     uint8_t bReserved; //0x00
     uint8_t wSubsetLength[2]; //sizeof(struct MS_FUNC_SUBSET_HEADER) including MS_COMP_ID_FEAT_DESC
     struct MS_COMP_ID_FEAT_DESC FEAT;
 };
 ```
+
+Each interface that you want to apply the WinUSB driver to requires its own MS_FUNC_SUBSET_HEADER.
+bFirstInterface is the interface number that you want to apply the WinUSB driver to.
 
 If the device only has a single interface, this header must be skipped:
 
@@ -289,3 +296,5 @@ available for any devices that request them.
 
 See the [libwdi WCID Devices page](https://github.com/pbatard/libwdi/wiki/WCID-Devices) for
 more information.
+
+### 
