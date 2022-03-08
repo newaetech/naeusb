@@ -67,6 +67,7 @@ void exit_cs(void)
 #define PIN_EBI_USB_SPARE1 FPGA_ALE_GPIO
 #endif
 
+#ifdef FPGA_ADDR_PORT
 void FPGA_setaddr(uint32_t addr)
 {
 	#if (USB_DEVICE_PRODUCT_ID == 0xACE5) || (USB_DEVICE_PRODUCT_ID == 0xC610)
@@ -80,6 +81,10 @@ void FPGA_setaddr(uint32_t addr)
 			gpio_set_pin_high(FPGA_ALE_GPIO);
 	#endif
 }
+#else
+void FPGA_setaddr(uint32_t addr)
+{}
+#endif
 
 /*
 Read four bytes from a given register, return as 32-bit number.
