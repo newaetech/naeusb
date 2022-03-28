@@ -48,7 +48,9 @@
 #include "udi.h"
 #include "udc.h"
 #include "naeusb_os_desc.h"
+#if NAEUSB_MPSSE_SUPPORT == 1
 #include "naeusb_mpsse.h"
+#endif
 
 
 /**
@@ -1102,6 +1104,7 @@ bool udc_process_setup(void)
 	if ((udd_g_ctrlreq.req.bmRequestType == 0xC0) && (udd_g_ctrlreq.req.bRequest == 0x01)) {
 
 		// Hack to apply WinUSB to interface 1 IFF mpsse is enabled
+#if NAEUSB_MPSSE_SUPPORT == 1
 		if (!mpsse_enabled()) {
 			// CompatibleID = "MINUSB"
 			MS_OS_DESC.FUNC[1].FEAT.CompatibleID[0] = 'M';
@@ -1109,6 +1112,7 @@ bool udc_process_setup(void)
 			// CompatibleID = "WINUSB"
 			MS_OS_DESC.FUNC[1].FEAT.CompatibleID[0] = 'W';
 		}
+#endif
 		udd_set_setup_payload((uint8_t *)&MS_OS_DESC, sizeof(struct MS_OS_DESC_SET_HEADER));
 		return true;
 	}

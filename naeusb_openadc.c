@@ -43,8 +43,10 @@ void openadc_progfpga_bulk(void){
 
         //nRST gets passed through on FPGA as well, we set this high and hope that is
         //correct for target.
+        #ifdef PIN_TARG_NRST_GPIO
         gpio_configure_pin(PIN_TARG_NRST_GPIO, (PIO_TYPE_PIO_OUTPUT_1 | PIO_DEFAULT));
         gpio_set_pin_high(PIN_TARG_NRST_GPIO);
+        #endif
         fpga_program_spi_setup1(prog_freq);
         break;
 
