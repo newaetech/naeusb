@@ -65,6 +65,8 @@ void naeusb_cdc_settings_out(void);
 
 void generic_isr(usart_driver *driver);
 
+bool NAEUSB_CDC_IS_RUNNING = false;
+
 #ifdef CW_TARGET_SPI
 
 void spi1util_toggleclk(uint8_t cycles, bool mosi_status)
@@ -434,7 +436,7 @@ bool configure_usart(usart_driver *driver, uint32_t baud, uint8_t stop_bits, uin
             break;
         case 7:
             driver->usartopts.char_length = US_MR_CHRL_7_BIT;
-            break;					
+            break;
         case 8:							
         default:
             driver->usartopts.char_length = US_MR_CHRL_8_BIT;
@@ -632,12 +634,15 @@ void cdc_disable(uint8_t port)
 	usart_driver *driver = get_nth_available_driver(port);
 
     driver->cdc_enabled = 0;
+    NAEUSB_CDC_IS_RUNNING = false;
 }
 
 uint8_t uart_buf[512] = {0};
 void my_callback_rx_notify(uint8_t port)
 {
+
 	usart_driver *driver = get_nth_available_driver(port);
+    NAEUSB_CDC_IS_RUNNING = true;
     
     if (driver->cdc_enabled && driver->enabled) {
         iram_size_t num_char = udi_cdc_multi_get_nb_received_data(port);
@@ -788,10 +793,11 @@ bool usart_setup_in_received(void)
 
 void cdc_send_to_pc(void)
 {
+    // if (!NAEUSB_CDC_IS_RUNNING) return; //fixes Pro streaming requiring connection to CDC
 	for (uint8_t i = 0; i < 4; i++) {
 		usart_driver *driver = get_nth_available_driver(i);
 		if (!driver) continue;
-		if (driver->cdc_enabled && driver->enabled) {
+		if (driver->cdc_enabled && driver->enabled && udi_cdc_multi_is_tx_ready(i)) {
 			while (circ_buf_has_char(&driver->rx_cdc_buf)) {
 				udi_cdc_multi_putc(i, get_from_circ_buf(&driver->rx_cdc_buf));
 			}
