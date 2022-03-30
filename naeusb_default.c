@@ -7,6 +7,10 @@
 #define RSTC_CR_KEY_PASSWD RSTC_CR_KEY(0xA5)
 #endif
 
+bool naeusb_sam_status_in(void)
+{
+    return false;
+}
 
 void naeusb_sam_cfg_out(void)
 {

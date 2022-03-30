@@ -170,6 +170,14 @@ bool mpsse_setup_out_received(void)
 /* Handle ctrl transfer on interface 1/2. Mostly used for debug purposes */
 bool mpsse_setup_in_received(void)
 {
+    if (udd_g_ctrlreq.req.bRequest == REQ_SAM_STATUS) {
+        if ((udd_g_ctrlreq.req.wValue & 0xFF) == 0x42) {
+            respbuf[0] = mpsse_state.enabled;
+            udd_g_ctrlreq.payload = respbuf;
+            udd_g_ctrlreq.payload_size = 1;
+            return true;
+        }
+    }
     // don't handle if not sent to our interface
     if (udd_g_ctrlreq.req.wIndex != 0x01) {
         return false;

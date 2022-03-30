@@ -3,6 +3,7 @@
 #include "naeusb.h"
 
 #define REQ_SAM_CFG       0x22
+#define REQ_SAM_STATUS 0x22
 
     #define SAM_SLOW_CLOCK_ON   0x01
     #define SAM_SLOW_CLOCK_OFF  0x02
