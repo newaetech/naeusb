@@ -41,7 +41,7 @@ struct  {
 
     uint32_t pins[12];
 } static mpsse_state = {
-    .cur_cmd = 0x00, 
+    .cur_cmd.u8 = 0x00, 
     .tx_idx = 0x00, .tx_bytes = 0x00, .rx_bytes = 0x02, .txn_len = 0x00, 
     .loopback_en = 0x00, .txn_lock = 0x00,
     .n_processed_cmds = 0x00,
@@ -389,7 +389,7 @@ uint8_t mpsse_tms_send(uint8_t value, uint8_t num_bits)
     // I don't think reads during TMS are typical, so hard to say
     for (; i < num_bits; i++) {
         if (mpsse_state.cur_cmd.b.lendian) {
-            read_value >> 1;
+            read_value >>= 1;
             read_value |= mpsse_tms_bit_send((value >> i) & 0x01) << (7 - i);
         } else {
             read_value |= mpsse_tms_bit_send((value >> (7 - i)) & 0x01) << (7 - i);

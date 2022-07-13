@@ -450,7 +450,7 @@ bool configure_usart(usart_driver *driver, uint32_t baud, uint8_t stop_bits, uin
     init_circ_buf(&driver->rx_cdc_buf);
 
     usart_init_rs232(driver->usart, &driver->usartopts, sysclk_get_cpu_hz());
-    
+    return true;
 }
 
 void ctrl_usart_out(void)
@@ -462,14 +462,14 @@ void ctrl_usart_out(void)
 
     switch (udd_g_ctrlreq.req.wValue & 0xFF) {
     case USART_WVREQ_INIT:
-        if (udd_g_ctrlreq.req.wLength != 7) return false;
+        if (udd_g_ctrlreq.req.wLength != 7) return;
 
         buf2word(baud, udd_g_ctrlreq.payload);
 		usart_enableIO(driver);
         configure_usart(driver, baud, udd_g_ctrlreq.payload[4], 
         udd_g_ctrlreq.payload[5], udd_g_ctrlreq.payload[6]);
 
-        return true;
+        return ;
 
     case USART_WVREQ_ENABLE:
 		usart_enableIO(driver);
@@ -484,7 +484,7 @@ void ctrl_usart_out(void)
         usart_disable_rx(driver->usart);
         usart_disable_tx(driver->usart);
         usart_disable_interrupt(driver->usart, UART_IER_RXRDY | UART_IER_TXRDY);
-        return true;
+        return ;
 
 
     }
@@ -666,7 +666,7 @@ void my_callback_config(uint8_t port, usb_cdc_line_coding_t * cfg)
 
         uint8_t stop_bits = ((uint32_t)cfg->bCharFormat) << 12;
         uint8_t dbits = ((uint32_t)cfg->bDataBits - 5) << 6;
-        uint8_t parity_type = US_MR_PAR_NO;
+        uint16_t parity_type = US_MR_PAR_NO;
         switch(cfg->bParityType) {
             case CDC_PAR_NONE:
             parity_type = US_MR_PAR_NO;
@@ -690,7 +690,7 @@ void my_callback_config(uint8_t port, usb_cdc_line_coding_t * cfg)
 
 
         configure_usart(driver, baud, stop_bits, parity_type, dbits);
-		if (!(usart_get_interrupt_mask(driver) & UART_IER_RXRDY)) {
+		if (!(usart_get_interrupt_mask(driver->usart) & UART_IER_RXRDY)) {
 			usart_enable_rx(driver->usart);
 			usart_enable_tx(driver->usart);
 
