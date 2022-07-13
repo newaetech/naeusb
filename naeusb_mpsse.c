@@ -499,6 +499,11 @@ void mpsse_handle_transmission(void)
 
 }
 
+/*
+Handle special (usually non read/write) MPSSE commands
+
+Ex. Pin config, read buffer back
+*/
 void mpsse_handle_special(void)
 {
     uint8_t value = 0;
@@ -574,12 +579,12 @@ void mpsse_handle_special(void)
                 #if USB_DEVICE_PRODUCT_ID == 0xACE3
                     mpsse_state.pins[3] = PIN_PDIDRX_GPIO;
                 #endif
-                // gpio_configure_pin(mpsse_state.pins[3], PIO_OUTPUT_1);
+
+                gpio_configure_pin(mpsse_state.pins[3], PIO_INPUT);
                 #ifdef MPSSE_TMS_WR
                 gpio_configure_pin(MPSSE_TMS_WR, PIO_OUTPUT_0);
                 #endif
 
-                gpio_configure_pin(mpsse_state.pins[3], PIO_INPUT);
                 mpsse_state.swd_out_en = 0;
             }
         } else {
