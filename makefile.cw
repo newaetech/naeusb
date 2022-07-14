@@ -14,7 +14,15 @@ NM = arm-none-eabi-nm
 CFLAGS += -fdata-sections -ffunction-sections -mlong-calls -g3 -Wall -pipe 
 CFLAGS += -fno-strict-aliasing -Wall -Wstrict-prototypes -Wmissing-prototypes -Wchar-subscripts 
 CFLAGS += -Wcomment -Wformat=2 --param max-inline-insns-single=500
-CFLAGS += -DDEBUG -D__SAM3U1C__ -DARM_MATH_CM3=true -Dprintf=iprintf -DUDD_ENABLE -Dscanf=iscanf -DPLATFORMCW1190=1
+CFLAGS += -DDEBUG -DARM_MATH_CM3=true -Dprintf=iprintf -DUDD_ENABLE -Dscanf=iscanf -DPLATFORMCW1190=1
+
+ifeq ($(TARGET),ChipWhisperer-Lite)
+	CFLAGS += -D__SAM3U2C__
+else ifeq ($(TARGET),ChipWhisperer-Husky)
+	CFLAGS += -D__SAM3U2C__
+else ifeq ($(TARGET),ChipWhisperer-Pro)
+	CFLAGS += -D__SAM3U4E__
+endif
 
 ##### 
 CFLAGS += -Wno-discarded-qualifiers -Wno-strict-prototypes -Wno-missing-prototypes -Wno-unused-value -Wno-pointer-sign -Wno-unused-variable
@@ -133,7 +141,7 @@ lib: $(LIBNAME)
 
 begin:
 	@$(ECHO_BLANK)
-	@echo Welcome to another exciting ChipWhisperer target build!!
+	@echo Building for board $(TARGET)
 
 end:
 	@echo   +--------------------------------------------------------
@@ -216,7 +224,7 @@ gccversion :
 $(OBJDIR)/%.o : %.c
 	@$(MAKEDIR) -p ./$(dir $@)
 	@echo $(MSG_COMPILING) $<
-	@$(CC) -c $(ALL_CFLAGS) $< -o $@
+	$(CC) -c $(ALL_CFLAGS) $< -o $@
 
 
 # Compile: create object files from C++ source files.
