@@ -1,6 +1,5 @@
-SRC += $(wildcard naeusb/HAL/*.c)
 
-EXTRAINCDIRS += naeusb/HAL/inc
+
 EXTRAINCDIRS += naeusb
 EXTRAINCDIRS += config
 
@@ -18,14 +17,27 @@ CFLAGS += -DDEBUG -DARM_MATH_CM3=true -Dprintf=iprintf -DUDD_ENABLE -Dscanf=isca
 
 ifeq ($(TARGET),ChipWhisperer-Lite)
 	CFLAGS += -D__SAM3U2C__
+	HAL = SAM3U
 else ifeq ($(TARGET),ChipWhisperer-Husky)
 	CFLAGS += -D__SAM3U2C__
+	HAL = SAM3U
 else ifeq ($(TARGET),ChipWhisperer-Pro)
 	CFLAGS += -D__SAM3U4E__
+	HAL = SAM3U
+else ifeq ($(TARGET),ChipWhisperer-Nano)
+	CFLAGS += -D__SAM4SD16B__ -DUDD_NO_SLEEP_MGR
+	HAL = SAM4S
+	LDFLAGS += --specs=nano.specs --specs=nosys.specs
 endif
 
+ifeq ($(HAL),SAM3U)
+	SRC += $(wildcard naeusb/sam3u_hal/*.c)
+	EXTRAINCDIRS += naeusb/sam3u_hal/inc
+else ifeq ($(HAL),SAM4S)
+	SRC += $(wildcard naeusb/sam4s_hal/*.c)
+	EXTRAINCDIRS += naeusb/sam4s_hal/inc
+endif
 ##### 
-CFLAGS += -Wno-discarded-qualifiers -Wno-strict-prototypes -Wno-missing-prototypes -Wno-unused-value -Wno-pointer-sign -Wno-unused-variable
 
 
 MSG_ERRORS_NONE = Errors: none
