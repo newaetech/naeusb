@@ -1,9 +1,9 @@
 /**
  * \file
  *
- * \brief User Interface
+ * \brief TWI Slave driver for SAM.
  *
- * Copyright (c) 2012 Atmel Corporation. All rights reserved.
+ * Copyright (c) 2011-2014 Atmel Corporation. All rights reserved.
  *
  * \asf_license_start
  *
@@ -41,53 +41,47 @@
  *
  */
 
-#include <asf.h>
-#include "ui.h"
-#include "tasks.h"
+#ifndef _TWI_SLAVE_H_
+#define _TWI_SLAVE_H_
 
-void ui_init(void)
+#include "twi.h"
+#include "sysclk.h"
+
+typedef Twi *twi_slave_t;
+
+static inline void twi_slave_setup(twi_slave_t p_twi, uint32_t dw_device_addr)
 {
-	// Initialize LEDs
-	LED_Off(LED0_GPIO);
-	LED_Off(LED1_GPIO);
-	//LED_Off(LED2_GPIO);
-}
-
-
-void ui_powerdown(void)
-{
-	LED_Off(LED0_GPIO);
-	LED_Off(LED1_GPIO);
-	
-	// Power off FPGA
-	//board_sram_pwroff();
-}
-
-void ui_wakeup(void)
-{
-	LED_On(LED0_GPIO);
-	//board_sram_pwron();
-}
-
-void ui_process(uint16_t framenumber)
-{
-	if ((framenumber % 1000) == 0) {
-		LED_On(LED0_GPIO);
+#if (!(SAMG51 || SAMG53 || SAMG54))
+	if (p_twi == TWI0) {
+		sysclk_enable_peripheral_clock(ID_TWI0);
+	} else
+#endif
+	if (p_twi == TWI1) {
+		sysclk_enable_peripheral_clock(ID_TWI1);
+#if (SAM4N || SAMG)
+	} else if (p_twi == TWI2) {
+		sysclk_enable_peripheral_clock(ID_TWI2);
+#endif
+#if SAMG55
+	} else if (p_twi == TWI3) {
+		sysclk_enable_peripheral_clock(ID_TWI3);
+	} else if (p_twi == TWI4) {
+		sysclk_enable_peripheral_clock(ID_TWI4);
+	} else if (p_twi == TWI5) {
+		sysclk_enable_peripheral_clock(ID_TWI5);
+	} else if (p_twi == TWI6) {
+		sysclk_enable_peripheral_clock(ID_TWI6);
+	} else if (p_twi == TWI7) {
+		sysclk_enable_peripheral_clock(ID_TWI7);
+#endif
+	} else {
+		// Do Nothing
 	}
-	if ((framenumber % 1000) == 500) {
-		LED_Off(LED0_GPIO);
-	}
-	
-	if ((framenumber % 512) == 0) {
-		// LED_Off(LED1_GPIO);
-		//LED_Off(LED2_GPIO);
-	}
+	twi_slave_init(p_twi, dw_device_addr);
 }
 
-/**
- * \defgroup UI User Interface
- *
- * Human interface on SAM3U-EK:
- * - Led 0 (D2) blinks when USB host has checked and enabled vendor interface
- * - Led 1 (D3) is on when loopback is running
- */
+#define twi_slave_enable(p_twi)  twi_enable_slave_mode(p_twi)
+
+#define twi_slave_disable(p_twi)  twi_disable_slave_mode(p_twi)
+
+#endif // _TWI_SLAVE_H_
