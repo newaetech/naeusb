@@ -73,13 +73,12 @@ void FPGA_setaddr(uint32_t addr)
 	#if (USB_DEVICE_PRODUCT_ID == 0xACE5) || (USB_DEVICE_PRODUCT_ID == 0xC610)
 	//husky
 	  FPGA_ADDR_PORT->PIO_ODSR = (FPGA_ADDR_PORT->PIO_ODSR & 0x40) | (addr & 0x3F) | ((addr & 0xC0) << 1);
-	  gpio_set_pin_low(PIN_EBI_USB_SPARE1);
-	  gpio_set_pin_high(PIN_EBI_USB_SPARE1);
 	#else
 			pio_sync_output_write(FPGA_ADDR_PORT, addr);
+	#endif
+
 			gpio_set_pin_low(FPGA_ALE_GPIO);
 			gpio_set_pin_high(FPGA_ALE_GPIO);
-	#endif
 }
 #else
 void FPGA_setaddr(uint32_t addr)
