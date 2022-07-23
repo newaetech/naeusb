@@ -17,21 +17,35 @@ CFLAGS += -DDEBUG -DARM_MATH_CM3=true -Dprintf=iprintf -DUDD_ENABLE -Dscanf=isca
 
 ifeq ($(TARGET),ChipWhisperer-Lite)
 	CFLAGS += -D__SAM3U2C__
+	CDC=YES
 	HAL = SAM3U
 else ifeq ($(TARGET),ChipWhisperer-Husky)
 	CFLAGS += -D__SAM3U2C__
+	CDC=YES
+	HAL = SAM3U
+else ifeq ($(TARGET),ChipWhisperer-CW305)
+	CFLAGS += -D__SAM3U2E__
+	CDC=NO
 	HAL = SAM3U
 else ifeq ($(TARGET),ChipWhisperer-Pro)
 	CFLAGS += -D__SAM3U4E__
+	CDC=YES
 	HAL = SAM3U
 else ifeq ($(TARGET),ChipWhisperer-Nano)
 	CFLAGS += -D__SAM4SD16B__ -DUDD_NO_SLEEP_MGR
 	HAL = SAM4S
+	CDC=YES
 	LDFLAGS += --specs=nano.specs --specs=nosys.specs
 endif
 
 ifeq ($(HAL),SAM3U)
 	SRC += $(wildcard naeusb/sam3u_hal/*.c)
+	ifeq ($(CDC),YES)
+		SRC += naeusb/sam3u_hal/usb_cdc/udi_cdc.c
+		SRC += naeusb/sam3u_hal/usb_cdc/udi_composite_desc.c
+	else
+		SRC += naeusb/sam3u_hal/usb_no_cdc/udi_vendor_desc.c
+	endif
 	EXTRAINCDIRS += naeusb/sam3u_hal/inc
 else ifeq ($(HAL),SAM4S)
 	SRC += $(wildcard naeusb/sam4s_hal/*.c)
