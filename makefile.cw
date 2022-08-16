@@ -36,6 +36,19 @@ else ifeq ($(TARGET),ChipWhisperer-Nano)
 	HAL = SAM4S
 	CDC=YES
 	LDFLAGS += --specs=nano.specs --specs=nosys.specs
+else ifeq ($(TARGET),cw521)
+	CFLAGS += -D__SAM3U4E__
+	SRC += naeusb/sam3u_hal/chipid.c naeusb/sam3u_hal/cycle_counter.c naeusb/sam3u_hal/efc.c naeusb/sam3u_hal/exceptions.c
+	SRC += naeusb/sam3u_hal/flash_efc.c naeusb/sam3u_hal/interrupt_sam_nvic.c naeusb/sam3u_hal/led.c
+	SRC += naeusb/sam3u_hal/pio_handler.c naeusb/sam3u_hal/pio.c naeusb/sam3u_hal/pmc.c
+	SRC += naeusb/sam3u_hal/read.c naeusb/sam3u_hal/sleep.c naeusb/sam3u_hal/sleepmgr.c
+	SRC += naeusb/sam3u_hal/smc.c naeusb/sam3u_hal/spi.c naeusb/sam3u_hal/startup_sam3u.c
+	SRC += naeusb/sam3u_hal/syscalls.c naeusb/sam3u_hal/sysclk.c naeusb/sam3u_hal/system_sam3u.c
+	SRC += naeusb/sam3u_hal/tc.c naeusb/sam3u_hal/twi.c naeusb/sam3u_hal/uart.c
+	SRC += naeusb/sam3u_hal/udi_vendor.c naeusb/sam3u_hal/udphs_device.c naeusb/sam3u_hal/usart_serial.c
+	SRC += naeusb/sam3u_hal/usart.c naeusb/sam3u_hal/write.c naeusb/sam3u_hal/usb_no_cdc/udi_vendor_desc.c
+
+	EXTRAINCDIRS += naeusb/sam3u_hal/inc
 endif
 
 ifeq ($(HAL),SAM3U)

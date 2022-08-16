@@ -77,8 +77,11 @@ void iopins_normal(void)
 	
 	/* FPGA External memory interface */
 	//Allow sync writing to address pins
+
+#ifndef PIN_EBI_ADDR_BUS_A0
 	gpio_configure_group(FPGA_ADDR_PORT, FPGA_ADDR_PINS, (PIO_TYPE_PIO_OUTPUT_0 | PIO_DEFAULT));
 	pio_enable_output_write(FPGA_ADDR_PORT, FPGA_ADDR_PINS);
+#endif
 	
 	//ALE pin under SW control
 	gpio_configure_pin(FPGA_ALE_GPIO, FPGA_ALE_FLAGS);
