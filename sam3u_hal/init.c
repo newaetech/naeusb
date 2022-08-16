@@ -125,17 +125,17 @@ void iopins_normal(void)
 
 #ifdef CONF_BOARD_USART_RXD
 	/* Configure USART RXD pin */
-	gpio_configure_pin(PIN_USART1_RXD_IDX, PIN_USART1_RXD_FLAGS);
+	// gpio_configure_pin(PIN_USART1_RXD_IDX, PIN_USART1_RXD_FLAGS);
 #endif
 
 #ifdef CONF_BOARD_USART_TXD
 	/* Configure USART TXD pin */
-	gpio_configure_pin(PIN_USART1_TXD_IDX, PIN_USART1_TXD_FLAGS);
+	// gpio_configure_pin(PIN_USART1_TXD_IDX, PIN_USART1_TXD_FLAGS);
 #endif
 
 #ifdef CONF_BOARD_USART_SCK
 	/* Configure USART synchronous communication SCK pin */
-	gpio_configure_pin(PIN_USART1_SCK_IDX, PIN_USART1_SCK_FLAGS);
+	// gpio_configure_pin(PIN_USART1_SCK_IDX, PIN_USART1_SCK_FLAGS);
 #endif
 
 #ifdef CONF_BOARD_SMC_PSRAM
