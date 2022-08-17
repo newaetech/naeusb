@@ -1,4 +1,9 @@
+NULL :=
+TAB := $(NULL)    $(NULL)
+define NEWLINE
 
+
+endef
 
 EXTRAINCDIRS += naeusb
 EXTRAINCDIRS += config
@@ -14,6 +19,8 @@ CFLAGS += -fdata-sections -ffunction-sections -mlong-calls -g3 -Wall -pipe
 CFLAGS += -fno-strict-aliasing -Wall -Wstrict-prototypes -Wmissing-prototypes -Wchar-subscripts 
 CFLAGS += -Wcomment -Wformat=2 --param max-inline-insns-single=500
 CFLAGS += -DDEBUG -DARM_MATH_CM3=true -Dprintf=iprintf -DUDD_ENABLE -Dscanf=iscanf -DPLATFORMCW1190=1
+CFLAGS += -Wno-discarded-qualifiers -Wno-unused-function -Wno-unused-variable -Wno-strict-prototypes -Wno-missing-prototypes
+CFLAGS += -Wno-pointer-sign -Wno-unused-value
 
 ifeq ($(TARGET),ChipWhisperer-Lite)
 	CFLAGS += -D__SAM3U2C__
@@ -122,6 +129,16 @@ SCANF_LIB_MIN = -Wl,-u,vfscanf -lscanf_min
 # Floating point + %[ scanf version (requires MATH_LIB = -lm below)
 SCANF_LIB_FLOAT = -Wl,-u,vfscanf -lscanf_flt
 
+VERBOSE ?= false
+
+ifeq ($(VERBOSE), false)
+	COMPMSG = "  Compiling: $< ... "
+	LINKMSG = "  Linking: $@ ... "
+else
+	COMPMSG = "  Compiling: $(CC) -c $(ALL_CFLAGS) $< -o $@ ... "
+	LINKMSG = "  Linking: $@ w/ opts $(ALL_CFLAGS) $(LDFLAGS) ... "
+endif
+
 ########### OS OPTIONS #############################
 REMOVE = rm -f --
 REMOVEDIR = rm -rf
@@ -158,11 +175,12 @@ ALL_CPPFLAGS = $(MCU_FLAGS) -I. -x c++ $(CPPFLAGS) $(GENDEPFLAGS)
 ALL_ASFLAGS = $(MCU_FLAGS) -I. -x assembler-with-cpp $(ASFLAGS)
 
 all: 
-	@$(MAKE) clean_objs .dep 
-	@$(MAKE) beginmsg build sizeafter
+	@$(MAKE) --no-print-directory -O clean_objs .dep 
+	@$(MAKE) --no-print-directory -O begin build
+	@$(MAKE) --no-print-directory -O end sizeafter
 
 # Change the build target to build a HEX file or a library.
-build: elf hex bin eep lss sym | beginmsg
+build: elf hex bin eep lss sym
 
 beginmsg: begin gccversion
 #build: lib
@@ -179,12 +197,13 @@ lib: $(LIBNAME)
 
 
 begin:
-	@$(ECHO_BLANK)
-	@echo Building for board $(TARGET)
+	@echo +--------------------------------------------------------
+	@echo Building for board $(TARGET):
+	@echo +--------------------------------------------------------
 
 end:
 	@echo   +--------------------------------------------------------
-	@echo   + Built for platform "$(PLTNAME)"
+	@echo   + Built for board "$(TARGET)"
 	@echo   +--------------------------------------------------------
 
 fastnote:
@@ -199,13 +218,30 @@ HEXSIZE = $(SIZE) --target=ihex $(TARGET).hex
 # Note: custom ELFSIZE command can be specified in Makefile.platform
 # See avr/Makefile.avr for example
 ifeq ($(ELFSIZE),)
-  ELFSIZE = $(SIZE) $(TARGET).elf
+  ELFSIZE = $(SIZE) $(TARGET).elf -xA | grep .text
 endif
 
 sizeafter: build
 	@$(ECHO_BLANK)
-	@echo $(MSG_SIZE_AFTER)
-	@$(ELFSIZE)
+	@echo "Size of $(TARGET) binary:"
+	@echo "  FLASH:"
+	@echo -n "    "
+	@$(SIZE) $(TARGET).elf -xA | egrep "(section)"
+	@echo -n "    "
+	@$(SIZE) $(TARGET).elf -xA | egrep "(.text)"
+	@echo -n "    "
+	@$(SIZE) $(TARGET).elf -xA | egrep "(.relocate)"
+	@echo "  SRAM:"
+	@echo -n "    "
+	@$(SIZE) $(TARGET).elf -xA | egrep "(section)"
+	@echo -n "    "
+	@$(SIZE) $(TARGET).elf -xA | egrep "(.relocate)"
+	@echo -n "    "
+	@$(SIZE) $(TARGET).elf -xA | egrep "(.bss)"
+	@echo -n "    "
+	@$(SIZE) $(TARGET).elf -xA | egrep "(.mpsse)"
+	@echo -n "    "
+	@$(SIZE) $(TARGET).elf -xA | egrep "(.stack)"
 	@$(ECHO_BLANK)
 
 $(OBJ): | $(OBJDIR)
@@ -256,14 +292,17 @@ gccversion :
 .PRECIOUS : $(OBJ)
 %.elf: $(OBJ)
 	@$(ECHO_BLANK)
-	@echo $(MSG_LINKING) $@
-	$(CC) $(ALL_CFLAGS) $^ --output $@ $(LDFLAGS)
+	@echo -n $(LINKMSG)
+	@$(CC) $(ALL_CFLAGS) $^ --output $@ $(LDFLAGS)
+	@echo Done!
 
 # Compile: create object files from C source files.
+#@echo $(MSG_COMPILING) $<
 $(OBJDIR)/%.o : %.c
 	@$(MAKEDIR) -p ./$(dir $@)
-	@echo $(MSG_COMPILING) $<
-	$(CC) -c $(ALL_CFLAGS) $< -o $@
+	@echo -n $(COMPMSG)
+	@$(CC) -c $(ALL_CFLAGS) $< -o $@
+	@echo Done!
 
 
 # Compile: create object files from C++ source files.
