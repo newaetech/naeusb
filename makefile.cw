@@ -228,24 +228,21 @@ sizeafter: build
 	@$(ECHO_BLANK)
 	@head -n 30 $(TARGET).lss > /tmp/$(TARGET)-buildsize.txt
 	@echo "Size of $(TARGET) binary:"
+
 	@echo "  FLASH:"
 	@echo -n "    "
-	@egrep "(Idx)" /tmp/$(TARGET)-buildsize.txt || true
-	@echo -n "    "
-	@egrep "(.text)" /tmp/$(TARGET)-buildsize.txt || true
-	@echo -n "    "
+	@egrep "(Idx)" /tmp/$(TARGET)-buildsize.txt && echo -n "    " || true
+	@egrep "(.text)" /tmp/$(TARGET)-buildsize.txt && echo -n "    " || true
 	@egrep "(.relocate)" /tmp/$(TARGET)-buildsize.txt || true
+
 	@echo "  SRAM:"
 	@echo -n "    "
-	@egrep "(Idx)" /tmp/$(TARGET)-buildsize.txt || true
-	@echo -n "    "
-	@egrep "(.relocate)" /tmp/$(TARGET)-buildsize.txt || true
-	@echo -n "    "
-	@egrep "(.bss)" /tmp/$(TARGET)-buildsize.txt || true
-	@echo -n "    "
-	@egrep "(.mpsse)" /tmp/$(TARGET)-buildsize.txt || true
-	@echo -n "    "
+	@egrep "(Idx)" /tmp/$(TARGET)-buildsize.txt && echo -n "    " || true
+	@egrep "(.relocate)" /tmp/$(TARGET)-buildsize.txt && echo -n "    " || true
+	@egrep "(.bss)" /tmp/$(TARGET)-buildsize.txt && echo -n "    " || true
+	@egrep "(.mpsse)" /tmp/$(TARGET)-buildsize.txt && echo -n "    " || true
 	@egrep "(.stack)" /tmp/$(TARGET)-buildsize.txt || true
+
 	@$(ECHO_BLANK)
 
 $(OBJ): | $(OBJDIR)
