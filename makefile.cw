@@ -20,7 +20,7 @@ CFLAGS += -fno-strict-aliasing -Wall -Wstrict-prototypes -Wmissing-prototypes -W
 CFLAGS += -Wcomment -Wformat=2 --param max-inline-insns-single=500
 CFLAGS += -DDEBUG -DARM_MATH_CM3=true -Dprintf=iprintf -DUDD_ENABLE -Dscanf=iscanf -DPLATFORMCW1190=1
 CFLAGS += -Wno-discarded-qualifiers -Wno-unused-function -Wno-unused-variable -Wno-strict-prototypes -Wno-missing-prototypes
-CFLAGS += -Wno-pointer-sign -Wno-unused-value -Wno-unused-but-set-variable
+CFLAGS += -Wno-pointer-sign -Wno-unused-value 
 
 ifeq ($(TARGET),ChipWhisperer-Lite)
 	CFLAGS += -D__SAM3U2C__
@@ -132,11 +132,13 @@ SCANF_LIB_FLOAT = -Wl,-u,vfscanf -lscanf_flt
 VERBOSE ?= false
 
 ifeq ($(VERBOSE), false)
-	COMPMSG = "  Compiling: $< ... "
-	LINKMSG = "  Linking: $@ ... "
+	COMPMSG = "    $< ..."
+	LINKMSG = "    $@ ..."
+	DONEMSG = "Done!"
 else
-	COMPMSG = "  Compiling: $(CC) -c $(ALL_CFLAGS) $< -o $@ ... "
-	LINKMSG = "  Linking: $@ w/ opts $(ALL_CFLAGS) $(LDFLAGS) ... "
+	COMPMSG = "    $(CC) -c $(ALL_CFLAGS) $< -o $@ ..."
+	LINKMSG = "    $@ w/ opts $(ALL_CFLAGS) $(LDFLAGS) ..."
+	DONEMSG = "Done!\n"
 endif
 
 ########### OS OPTIONS #############################
@@ -221,27 +223,29 @@ ifeq ($(ELFSIZE),)
   ELFSIZE = $(SIZE) $(TARGET).elf -xA | grep .text
 endif
 
+#@$(SIZE) $(TARGET).elf -xA > /tmp/$(TARGET)-buildsize.txt
 sizeafter: build
 	@$(ECHO_BLANK)
+	@head -n 30 $(TARGET).lss > /tmp/$(TARGET)-buildsize.txt
 	@echo "Size of $(TARGET) binary:"
 	@echo "  FLASH:"
 	@echo -n "    "
-	@$(SIZE) $(TARGET).elf -xA | egrep "(section)"
+	@egrep "(Idx)" /tmp/$(TARGET)-buildsize.txt || true
 	@echo -n "    "
-	@$(SIZE) $(TARGET).elf -xA | egrep "(.text)"
+	@egrep "(.text)" /tmp/$(TARGET)-buildsize.txt || true
 	@echo -n "    "
-	@$(SIZE) $(TARGET).elf -xA | egrep "(.relocate)"
+	@egrep "(.relocate)" /tmp/$(TARGET)-buildsize.txt || true
 	@echo "  SRAM:"
 	@echo -n "    "
-	@$(SIZE) $(TARGET).elf -xA | egrep "(section)"
+	@egrep "(Idx)" /tmp/$(TARGET)-buildsize.txt || true
 	@echo -n "    "
-	@$(SIZE) $(TARGET).elf -xA | egrep "(.relocate)"
+	@egrep "(.relocate)" /tmp/$(TARGET)-buildsize.txt || true
 	@echo -n "    "
-	@$(SIZE) $(TARGET).elf -xA | egrep "(.bss)"
+	@egrep "(.bss)" /tmp/$(TARGET)-buildsize.txt || true
 	@echo -n "    "
-	@$(SIZE) $(TARGET).elf -xA | egrep "(.mpsse)"
+	@egrep "(.mpsse)" /tmp/$(TARGET)-buildsize.txt || true
 	@echo -n "    "
-	@$(SIZE) $(TARGET).elf -xA | egrep "(.stack)"
+	@egrep "(.stack)" /tmp/$(TARGET)-buildsize.txt || true
 	@$(ECHO_BLANK)
 
 $(OBJ): | $(OBJDIR)
@@ -292,17 +296,19 @@ gccversion :
 .PRECIOUS : $(OBJ)
 %.elf: $(OBJ)
 	@$(ECHO_BLANK)
-	@echo -n $(LINKMSG)
+	@echo LINKING:
+	@echo -en $(LINKMSG)
 	@$(CC) $(ALL_CFLAGS) $^ --output $@ $(LDFLAGS)
-	@echo Done!
+	@echo -e $(DONEMSG)
 
 # Compile: create object files from C source files.
 #@echo $(MSG_COMPILING) $<
 $(OBJDIR)/%.o : %.c
 	@$(MAKEDIR) -p ./$(dir $@)
-	@echo -n $(COMPMSG)
+	@echo Compiling: 
+	@echo -en $(COMPMSG)
 	@$(CC) -c $(ALL_CFLAGS) $< -o $@
-	@echo Done!
+	@echo -e $(DONEMSG)
 
 
 # Compile: create object files from C++ source files.
