@@ -20,7 +20,7 @@ CFLAGS += -fno-strict-aliasing -Wall -Wstrict-prototypes -Wmissing-prototypes -W
 CFLAGS += -Wcomment -Wformat=2 --param max-inline-insns-single=500
 CFLAGS += -DDEBUG -DARM_MATH_CM3=true -Dprintf=iprintf -DUDD_ENABLE -Dscanf=iscanf -DPLATFORMCW1190=1
 CFLAGS += -Wno-discarded-qualifiers -Wno-unused-function -Wno-unused-variable -Wno-strict-prototypes -Wno-missing-prototypes
-CFLAGS += -Wno-pointer-sign -Wno-unused-value
+CFLAGS += -Wno-pointer-sign -Wno-unused-value -Wno-unused-but-set-variable
 
 ifeq ($(TARGET),ChipWhisperer-Lite)
 	CFLAGS += -D__SAM3U2C__

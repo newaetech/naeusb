@@ -479,7 +479,9 @@ void WDT_Handler        ( void );
 #define CHIP_CIDR         (0x29970CE0UL)
 #define NB_CH_ADC         (10UL)
 #define NB_CH_DAC         (2UL)
-#define USB_DEVICE_MAX_EP (8UL)
+// #ifndef USB_DEVICE_MAX_EP
+// #define USB_DEVICE_MAX_EP (8UL) < this shouldn't be defined here
+// #endif USB_DEVICE_MAX_EP
 
 /* ************************************************************************** */
 /*   ELECTRICAL DEFINITIONS FOR SAM4SD16B */
