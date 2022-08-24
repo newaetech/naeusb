@@ -7,6 +7,15 @@
 // used to switch USB configuration from CDC to MPSSE
 extern void switch_configurations(void);
 
+volatile uint8_t waitvar = 0;
+#define numwait 2
+
+static inline void toggle_sck(void)
+{
+    for (waitvar = 0; waitvar < numwait; waitvar++);
+    gpio_toggle_pin(MPSSE_SCK_GPIO);
+    for (waitvar = 0; waitvar < numwait; waitvar++);
+}
 
 #pragma pack(1)
 struct  {
@@ -38,6 +47,7 @@ struct  {
     uint8_t swd_mode; //swd mode enabled
     uint8_t swd_out_en; //1 for swd output, 0 for swd input
     uint8_t enabled; // mpsse mode enabled?
+    uint32_t swd_out_en_pin;
 
     uint32_t pins[12];
 } static mpsse_state = {
@@ -47,6 +57,11 @@ struct  {
     .n_processed_cmds = 0x00,
 
     .tx_req = 0x00, .swd_mode = 0x00, .swd_out_en = 0x00, .enabled = 0x00,
+    #ifdef MPSSE_TMS_WR
+    .swd_out_en_pin = MPSSE_TMS_WR_0,
+    #elif MPSSE_TMS_WR_PIN_0
+    .swd_out_en_pin = MPSSE_TMS_WR_PIN_0,
+    #endif
     .pins = {
         MPSSE_SCK_GPIO,
         MPSSE_DOUT_GPIO,
@@ -129,7 +144,31 @@ bool mpsse_setup_out_received(void)
         mpsse_state.txn_lock = 1;
         //restart USB
         udc_start();
+        gpio_configure_pin(PIN_TARG_NRST_GPIO, PIO_DEFAULT | PIO_OUTPUT_0);
         return true;
+    } else if ((wValue == 0x43) && (udd_g_ctrlreq.req.bRequest == REQ_SAM_CFG)) {
+        uint8_t swd_pin = udd_g_ctrlreq.req.wValue >> 8;
+        #ifndef MPSSE_TMS_WR_PIN_0
+            return false;
+        #else
+        if (swd_pin == 0x00) {
+            mpsse_state.swd_out_en_pin = MPSSE_TMS_WR_PIN_0;
+            return true;
+        } 
+        #endif
+        #ifdef MPSSE_TMS_WR_PIN_1
+        else if (swd_pin == 0x01) {
+            mpsse_state.swd_out_en_pin = MPSSE_TMS_WR_PIN_1;
+            return true;
+        }
+        #endif
+        #ifdef MPSSE_TMS_WR_PIN_2
+        else if (swd_pin == 0x02) {
+            mpsse_state.swd_out_en_pin = MPSSE_TMS_WR_PIN_2;
+            return true;
+        }
+        #endif
+        return false;
     }
 
     if ((udd_g_ctrlreq.req.wIndex != 0x01) && (udd_g_ctrlreq.req.wIndex != 0x02)) {
@@ -245,16 +284,13 @@ uint8_t mpsse_send_bit(uint8_t value)
         gpio_set_pin_low(dpin);
     }
 
-    //setup delay
-    volatile uint8_t i = 0;
-
     // last bit will be received on TDI
-    gpio_toggle_pin(MPSSE_SCK_GPIO);
-
+    toggle_sck();
     //now we read data in
     read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
 
-    gpio_toggle_pin(MPSSE_SCK_GPIO);
+    toggle_sck();
+    
 
     
     return read_value & 0x01;
@@ -286,15 +322,16 @@ uint8_t mpsse_swd_send_bit(uint8_t value)
     }
 
     //setup delay
-    volatile uint8_t i = 0;
 
     if (!mpsse_state.swd_out_en)
         read_value = gpio_pin_is_high(dpin);
 
     // last bit will be received on TDI
-    gpio_toggle_pin(MPSSE_SCK_GPIO);
 
-    gpio_toggle_pin(MPSSE_SCK_GPIO);
+    toggle_sck();
+
+    toggle_sck();
+
 
     
     return read_value & 0x01;
@@ -350,15 +387,15 @@ uint8_t mpsse_tms_bit_send(uint8_t value)
     }
 
     //setup delay
-    volatile uint8_t i = 0;
 
     read_value = gpio_pin_is_high(dpin);
 
-    gpio_toggle_pin(MPSSE_SCK_GPIO);
+    toggle_sck();
 
     read_value = gpio_pin_is_high(MPSSE_DIN_GPIO);
 
-    gpio_toggle_pin(MPSSE_SCK_GPIO);
+
+    toggle_sck();
 
     
     return read_value & 0x01;
@@ -560,6 +597,7 @@ void mpsse_handle_special(void)
         value = MPSSE_TX_BUFFER[mpsse_state.tx_idx++];
         direction = MPSSE_TX_BUFFER[mpsse_state.tx_idx++];
 
+    uint32_t swd_out_en_pin;
         #if MPSSE_SWD_SUPPORT
         if ((value & 1)) {
             // special SWD enable case
@@ -570,10 +608,12 @@ void mpsse_handle_special(void)
                 #if USB_DEVICE_PRODUCT_ID == 0xACE3
                     mpsse_state.pins[3] = PIN_PDIDTX_GPIO;
                 #endif
-                #ifdef MPSSE_TMS_WR
-                gpio_configure_pin(MPSSE_TMS_WR, PIO_OUTPUT_1);
+
+                #if defined(MPSSE_TMS_WR) || defined(MPSSE_TMS_WR_PIN_0)
+                gpio_configure_pin(mpsse_state.swd_out_en_pin, PIO_OUTPUT_1);
                 #endif
                 gpio_configure_pin(mpsse_state.pins[3], PIO_OUTPUT_1);
+
             } else {
                 //hack for Pro
                 #if USB_DEVICE_PRODUCT_ID == 0xACE3
@@ -581,8 +621,9 @@ void mpsse_handle_special(void)
                 #endif
 
                 gpio_configure_pin(mpsse_state.pins[3], PIO_INPUT);
-                #ifdef MPSSE_TMS_WR
-                gpio_configure_pin(MPSSE_TMS_WR, PIO_OUTPUT_0);
+
+                #if defined(MPSSE_TMS_WR) || defined(MPSSE_TMS_WR_PIN_0)
+                gpio_configure_pin(mpsse_state.swd_out_en_pin, PIO_OUTPUT_0);
                 #endif
 
                 mpsse_state.swd_out_en = 0;
