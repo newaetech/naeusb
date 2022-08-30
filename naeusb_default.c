@@ -31,7 +31,7 @@ void naeusb_sam_cfg_out(void)
         /* Jump to ROM-resident bootloader */
     case SAM_ENTER_BOOTLOADER:
         /* Turn off connected stuff */
-        //board_power(0);
+        board_power(0);
 
         /* Clear ROM-mapping bit. */
         efc_perform_command(EFC0, EFC_FCMD_CGPB, 1);

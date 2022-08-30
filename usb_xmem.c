@@ -67,6 +67,10 @@ void exit_cs(void)
 #define PIN_EBI_USB_SPARE1 FPGA_ALE_GPIO
 #endif
 
+#ifndef FPGA_ALE_GPIO
+#define FPGA_ALE_GPIO PIN_EBI_USB_SPARE1
+#endif
+
 #ifdef FPGA_ADDR_PORT
 void FPGA_setaddr(uint32_t addr)
 {

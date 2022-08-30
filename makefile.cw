@@ -21,6 +21,7 @@ CFLAGS += -Wcomment -Wformat=2 --param max-inline-insns-single=500
 CFLAGS += -DDEBUG -DARM_MATH_CM3=true -Dprintf=iprintf -DUDD_ENABLE -Dscanf=iscanf -DPLATFORMCW1190=1
 CFLAGS += -Wno-discarded-qualifiers -Wno-unused-function -Wno-unused-variable -Wno-strict-prototypes -Wno-missing-prototypes
 CFLAGS += -Wno-pointer-sign -Wno-unused-value 
+PROGCMD="import sys, time; assert len(sys.argv) > 1; import chipwhisperer as cw; exec('try: scope = cw.scope(); p = cw.SAMFWLoader(scope); p.enter_bootloader(True); time.sleep(2);\nexcept: pass'); cw.program_sam_firmware(fw_path=sys.argv[1])" $(TARGET).bin
 
 ifeq ($(TARGET),ChipWhisperer-Lite)
 	CFLAGS += -D__SAM3U2C__
@@ -34,6 +35,7 @@ else ifeq ($(TARGET),ChipWhisperer-CW305)
 	CFLAGS += -D__SAM3U2E__
 	CDC=NO
 	HAL = SAM3U
+	PROGCMD="import sys, time; assert len(sys.argv) > 1; import chipwhisperer as cw; exec('try: scope = cw.target(None, cw.targets.CW305); p = cw.SAMFWLoader(scope); p.enter_bootloader(True); time.sleep(2);\nexcept: pass'); cw.program_sam_firmware(fw_path=sys.argv[1])" $(TARGET).bin
 else ifeq ($(TARGET),ChipWhisperer-Pro)
 	CFLAGS += -D__SAM3U4E__
 	CDC=YES
@@ -56,6 +58,15 @@ else ifeq ($(TARGET),cw521)
 	SRC += naeusb/sam3u_hal/usart.c naeusb/sam3u_hal/write.c naeusb/sam3u_hal/usb_no_cdc/udi_vendor_desc.c
 
 	EXTRAINCDIRS += naeusb/sam3u_hal/inc
+
+else ifeq ($(TARGET),phywhisperer)
+	CFLAGS += -D__SAM3U2E__
+	CDC=NO
+	HAL = SAM3U
+	PROGCMD="import sys, time; assert len(sys.argv) > 1; \
+	import phywhisperer.usb as pw; \
+	exec('try: phy = pw.Usb(); phy.con(); phy.usb.enterBootloader(True); time.sleep(2);\
+	\nexcept Exception as e: print(e)'); pw.program_sam_firmware(fw_path=sys.argv[1])" $(TARGET).bin
 endif
 
 ifeq ($(HAL),SAM3U)
@@ -381,7 +392,7 @@ clean_list :
 # this makes a file called 1 because of the assert ... > 1
 # idk how to fix it so we just remove the file
 program : 
-	@python -c "import sys, time; assert len(sys.argv) > 1; import chipwhisperer as cw; exec('try: scope = cw.scope(); p = cw.SAMFWLoader(scope); p.enter_bootloader(True); time.sleep(2);\nexcept: pass'); cw.program_sam_firmware(fw_path=sys.argv[1])" $(TARGET).bin
+	python -c $(PROGCMD)
 	@rm 1
 
 
