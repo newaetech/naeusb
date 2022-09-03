@@ -144,7 +144,9 @@ bool mpsse_setup_out_received(void)
         mpsse_state.txn_lock = 1;
         //restart USB
         udc_start();
+        #ifdef PIN_TARG_NRST_GPIO
         gpio_configure_pin(PIN_TARG_NRST_GPIO, PIO_DEFAULT | PIO_OUTPUT_0);
+        #endif
         return true;
     } else if ((wValue == 0x43) && (udd_g_ctrlreq.req.bRequest == REQ_SAM_CFG)) {
         uint8_t swd_pin = udd_g_ctrlreq.req.wValue >> 8;

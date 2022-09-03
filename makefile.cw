@@ -58,7 +58,10 @@ else ifeq ($(TARGET),cw521)
 	SRC += naeusb/sam3u_hal/usart.c naeusb/sam3u_hal/write.c naeusb/sam3u_hal/usb_no_cdc/udi_vendor_desc.c
 
 	EXTRAINCDIRS += naeusb/sam3u_hal/inc
-
+else ifeq ($(TARGET),CW310)
+	HAL = SAM3X
+	CFLAGS += -D__SAM3X8E__
+	CDC=YES
 else ifeq ($(TARGET),phywhisperer)
 	CFLAGS += -D__SAM3U2E__
 	CDC=NO
@@ -81,6 +84,9 @@ ifeq ($(HAL),SAM3U)
 else ifeq ($(HAL),SAM4S)
 	SRC += $(wildcard naeusb/sam4s_hal/*.c)
 	EXTRAINCDIRS += naeusb/sam4s_hal/inc
+else ifeq ($(HAL),SAM3X)
+	SRC += $(wildcard naeusb/sam3x_hal/*.c)
+	EXTRAINCDIRS += naeusb/sam3x_hal/inc
 endif
 ##### 
 
