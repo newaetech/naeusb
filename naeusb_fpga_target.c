@@ -250,7 +250,7 @@ void main_vendor_bulk_in_received(udd_ep_status_t status,
 }
 
 void ctrl_progfpga_bulk(void){
-    uint32_t prog_freq = 1E6;
+    uint32_t prog_freq = 20E6;
     switch(udd_g_ctrlreq.req.wValue){
         case 0xA0:
             if (udd_g_ctrlreq.req.wLength == 4) {
