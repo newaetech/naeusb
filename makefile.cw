@@ -123,6 +123,13 @@ CFLAGS += -funsigned-char -funsigned-bitfields -fshort-enums
 CFLAGS += $(patsubst %,-I%,$(EXTRAINCDIRS))
 CFLAGS += $(CSTANDARD)
 
+GCCCOLOURS?=YES
+ifeq ($(GCCCOLOURS),YES)
+	CFLAGS += -fdiagnostics-color=always
+else
+	CFLAGS += -fdiagnostics-color=auto
+endif
+
 LDFLAGS += -Wl,-Map=$(TARGET).map,--cref
 LDFLAGS += $(EXTMEMOPTS)
 LDFLAGS += $(patsubst %,-L%,$(EXTRALIBDIRS))
