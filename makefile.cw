@@ -126,6 +126,8 @@ CFLAGS += $(CSTANDARD)
 GCCCOLOURS?=YES
 ifeq ($(GCCCOLOURS),YES)
 	CFLAGS += -fdiagnostics-color=always
+else ifeq ($(GCCCOLOURS),NO)
+	CFLAGS += -fdiagnostics-color=never
 else
 	CFLAGS += -fdiagnostics-color=auto
 endif
