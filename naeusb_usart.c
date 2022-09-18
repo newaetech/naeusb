@@ -752,7 +752,8 @@ bool usart_setup_in_received(void)
         unsigned int cnt;
 		usart_driver *driver = get_nth_available_driver(udd_g_ctrlreq.req.wValue >> 8);
 		if (!driver) return false;
-        for(cnt = 0; cnt < udd_g_ctrlreq.req.wLength; cnt++){
+        unsigned int data = (udd_g_ctrlreq.req.wLength > 128) ? 128 : udd_g_ctrlreq.req.wLength;
+        for(cnt = 0; cnt < data; cnt++){
             respbuf[cnt] = usart_driver_getchar(driver);
         }
         udd_g_ctrlreq.payload = respbuf;

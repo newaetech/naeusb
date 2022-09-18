@@ -9,8 +9,8 @@ static uint8_t naeusb_num_out_handlers = 0;
 static volatile bool main_b_vendor_enable = true;
 static bool active = false;
 
-COMPILER_WORD_ALIGNED uint8_t ctrlbuffer[64];
-COMPILER_WORD_ALIGNED uint8_t respbuf[64];
+COMPILER_WORD_ALIGNED uint8_t ctrlbuffer[128];
+COMPILER_WORD_ALIGNED uint8_t respbuf[128];
 
 COMPILER_WORD_ALIGNED
 uint8_t main_buf_loopback[MAIN_LOOPBACK_SIZE];
