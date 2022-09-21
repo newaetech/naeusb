@@ -35,3 +35,10 @@ Running `make program` will attempt to erase and program the device with the new
     1. conf_uart_serial.h
     1. conf_usb.h
     1. naeusb_board_config.h
+
+## REQ_SAM3U_CFG
+
+wValue & 0xFF:
+
+1. 0xFx: Device specific config
+1. 0x4x: MPSSE config
