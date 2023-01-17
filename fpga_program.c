@@ -90,10 +90,7 @@ void fpga_program_setup1(uint32_t prog_freq)
     FPGA_DO_SETUP();
     FPGA_CCLK_SETUP();
 
-    //pin setup doesn't transfer control over to USART, so have to do it manually
-    PIOA->PIO_PDR = (1 << PIN_FPGA_DO_GPIO) | (1 << PIN_FPGA_CCLK_GPIO);
     usart_enable_tx(FPGA_PROG_USART);
-	
 #else
 	#if FPGA_USE_BITBANG
 	FPGA_CCLK_SETUP();

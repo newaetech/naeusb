@@ -2,6 +2,9 @@
 #include "naeusb_fpga_target.h"
 #include "fpgautil_io.h"
 #include "fpga_program.h"
+#include "fpgaspi_program.h"
+#include "cdce906.h"
+#include "tps56520.h"
 #include "naeusb_default.h"
 
 #define USB_STATUS_NONE       0
