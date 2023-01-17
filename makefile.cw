@@ -62,6 +62,11 @@ else ifeq ($(TARGET),CW310)
 	HAL = SAM3X
 	CFLAGS += -D__SAM3X8E__
 	CDC=YES
+else ifeq ($(TARGET),CW340)
+# same for now, might be different at some point?
+	HAL = SAM3X
+	CFLAGS += -D__SAM3X8E__
+	CDC=YES
 else ifeq ($(TARGET),phywhisperer)
 	CFLAGS += -D__SAM3U2E__
 	CDC=NO
