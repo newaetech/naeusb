@@ -25,28 +25,34 @@ PROGCMD="import sys, time; assert len(sys.argv) > 1; import chipwhisperer as cw;
 
 ifeq ($(TARGET),ChipWhisperer-Lite)
 	CFLAGS += -D__SAM3U2C__
+	CFLAGS += -D__PLAT_CWLITE__
 	CDC=YES
 	HAL = SAM3U
 else ifeq ($(TARGET),ChipWhisperer-Husky)
 	CFLAGS += -D__SAM3U2C__
+	CFLAGS += -D__PLAT_HUSKY__
 	CDC=YES
 	HAL = SAM3U
 else ifeq ($(TARGET),ChipWhisperer-CW305)
 	CFLAGS += -D__SAM3U2E__
+	CFLAGS += -D__PLAT_CW305__
 	CDC=NO
 	HAL = SAM3U
 	PROGCMD="import sys, time; assert len(sys.argv) > 1; import chipwhisperer as cw; exec('try: scope = cw.target(None, cw.targets.CW305); p = cw.SAMFWLoader(scope); p.enter_bootloader(True); time.sleep(2);\nexcept: pass'); cw.program_sam_firmware(fw_path=sys.argv[1])" $(TARGET).bin
 else ifeq ($(TARGET),ChipWhisperer-Pro)
 	CFLAGS += -D__SAM3U4E__
+	CFLAGS += -D__PLAT_PRO__
 	CDC=YES
 	HAL = SAM3U
 else ifeq ($(TARGET),ChipWhisperer-Nano)
 	CFLAGS += -D__SAM4SD16B__ -DUDD_NO_SLEEP_MGR
+	CFLAGS += -D__PLAT_NANO__
 	HAL = SAM4S
 	CDC=YES
 	LDFLAGS += --specs=nano.specs --specs=nosys.specs
 else ifeq ($(TARGET),cw521)
 	CFLAGS += -D__SAM3U4E__
+	CFLAGS += -D__PLAT_CW521__
 	SRC += naeusb/sam3u_hal/chipid.c naeusb/sam3u_hal/cycle_counter.c naeusb/sam3u_hal/efc.c naeusb/sam3u_hal/exceptions.c
 	SRC += naeusb/sam3u_hal/flash_efc.c naeusb/sam3u_hal/interrupt_sam_nvic.c naeusb/sam3u_hal/led.c
 	SRC += naeusb/sam3u_hal/pio_handler.c naeusb/sam3u_hal/pio.c naeusb/sam3u_hal/pmc.c
@@ -61,14 +67,17 @@ else ifeq ($(TARGET),cw521)
 else ifeq ($(TARGET),CW310)
 	HAL = SAM3X
 	CFLAGS += -D__SAM3X8E__
+	CFLAGS += -D__PLAT_CW310__
 	CDC=YES
 else ifeq ($(TARGET),CW340)
 # same for now, might be different at some point?
 	HAL = SAM3X
+	CFLAGS += -D__PLAT_CW340__
 	CFLAGS += -D__SAM3X8E__
 	CDC=YES
 else ifeq ($(TARGET),phywhisperer)
 	CFLAGS += -D__SAM3U2E__
+	CFLAGS += -D__PLAT_PHY__
 	CDC=NO
 	HAL = SAM3U
 	PROGCMD="import sys, time; assert len(sys.argv) > 1; \
