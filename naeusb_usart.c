@@ -33,6 +33,7 @@
 #include <asf.h>
 #include "circbuffer.h"
 #include "usart_driver.h"
+#include "naeusb_default.h"
 #include "usart.h"
 #include "usb_protocol_cdc.h"
 #include "naeusb_usart.h"
@@ -331,6 +332,10 @@ void generic_isr(usart_driver *driver)
 		add_to_circ_buf(&driver->rxbuf, temp, false);
         if (driver->cdc_enabled)
             add_to_circ_buf(&driver->rx_cdc_buf, temp, false);
+        if (driver->rxbuf.dropped > 0) {
+            // LED_On(LED1_GPIO);
+            CURRENT_ERRORS |= CW_ERR_USART_RX_OVERFLOW;
+        }
 	}
 	
 	if (status & US_CSR_TXRDY){
@@ -361,11 +366,12 @@ bool ctrl_usart_in(void)
         if (udd_g_ctrlreq.req.wLength < 4) {
             return false;
         }
-
         udd_g_ctrlreq.payload = respbuf;
         udd_g_ctrlreq.payload_size = 4;
         cnt = circ_buf_count(&driver->rxbuf);
+        driver->rxbuf.dropped = 0; //clear dropped characters
         word2buf(respbuf, cnt);
+        CURRENT_ERRORS &= ~CW_ERR_USART_RX_OVERFLOW;
         return true;
     
     case USART_WVREQ_NUMWAIT_TX:
@@ -375,7 +381,9 @@ bool ctrl_usart_in(void)
         udd_g_ctrlreq.payload = respbuf;
         udd_g_ctrlreq.payload_size = 4;
         cnt = circ_buf_count(&driver->txbuf);
+        driver->txbuf.dropped = 0; //clear dropped characters
         word2buf(respbuf, cnt);
+        CURRENT_ERRORS &= ~CW_ERR_USART_TX_OVERFLOW;
         return true;
 
 
@@ -561,6 +569,9 @@ static void ctrl_usart_cb_data(void)
 	for (int i = 0; i < udd_g_ctrlreq.req.wLength; i++){
 		usart_driver_putchar(driver, udd_g_ctrlreq.payload[i]);
 	}
+    if (driver->txbuf.dropped > 0) {
+        CURRENT_ERRORS |= CW_ERR_USART_TX_OVERFLOW;
+    }
 }
 
 #ifdef CW_PROG_XMEGA
