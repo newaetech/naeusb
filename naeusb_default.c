@@ -67,9 +67,11 @@ void naeusb_sam_cfg_out(void)
 
     case SAM_LED_SETTINGS:
         LED_SETTING = (udd_g_ctrlreq.req.wValue >> 8) & 0xFF;
-        if (LED_SETTING == 0) {
-            LED_Off(LED1_GPIO);
-        }
+        #ifdef LED1_GPIO
+            if (LED_SETTING == 0) {
+                LED_Off(LED1_GPIO);
+            }
+        #endif
         break;
 
     case SAM_CLEAR_ERRORS:

@@ -21,6 +21,8 @@
 
 bool tps56520_init(void);
 bool tps56520_set(uint16_t mv_output);
+bool tps56520_detect(void);
 
+extern uint8_t TPS_CONNECTED;
 
 #endif /* TPS56520_H_ */

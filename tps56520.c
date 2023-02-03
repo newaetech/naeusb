@@ -20,6 +20,8 @@
 
 #define TPS56520_ADDR 0x34
 
+uint8_t TPS_CONNECTED = 0;
+
 unsigned char checkoddparity(unsigned char p);
 
 /* Is current byte odd-parity already? */
@@ -43,6 +45,11 @@ bool tps56520_init(void)
 	return false;
 }
 
+bool tps56520_detect(void)
+{
+	return twi_probe(TWI0, TPS56520_ADDR);
+}
+
 /* Set voltage in mV for FPGA VCC_INT Voltage */
 bool tps56520_set(uint16_t mv_output)
 {
@@ -50,11 +57,13 @@ bool tps56520_set(uint16_t mv_output)
 	I2C_LOCK = 1;
 	/* Validate output voltage is in range */
 	if ((mv_output < 600) || (mv_output > 1800)){
+		I2C_LOCK = 0;
 		return false;
 	}
 	
 	/* Avoid frying FPGA */
 	if (mv_output > 1200){
+		I2C_LOCK = 0;
 		return false;
 	}
 	

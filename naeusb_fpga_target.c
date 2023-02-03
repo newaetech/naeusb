@@ -1,4 +1,3 @@
-#define FPGA_USE_BITBANG 1
 #include "naeusb_fpga_target.h"
 #include "fpgautil_io.h"
 #include "fpga_program.h"
@@ -309,7 +308,7 @@ void main_vendor_bulk_out_received(udd_ep_status_t status,
             fpga_program_sendbyte(main_buf_loopback[i]);
         }
 
-        FPGA_CCLK_LOW();
+        // FPGA_CCLK_LOW();
     }
 
     //printf("BULKOUT: %d bytes\n", (int)nb_transfered);
