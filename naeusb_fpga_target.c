@@ -285,10 +285,10 @@ void main_vendor_bulk_out_received(udd_ep_status_t status,
         // Transfer aborted
 
         //restart
-        udi_vendor_bulk_out_run(
-                main_buf_loopback,
-                sizeof(main_buf_loopback),
-                main_vendor_bulk_out_received);
+        // udi_vendor_bulk_out_run(
+        //         main_buf_loopback,
+        //         sizeof(main_buf_loopback),
+        //         main_vendor_bulk_out_received);
 
         return;
     }
