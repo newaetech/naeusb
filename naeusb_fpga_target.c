@@ -233,6 +233,10 @@ void ctrl_writemem_bulk(void){
     /* Set address */
     //Not required - this is done automatically via the XMEM interface
     //instead of using a "cheater" port.
+    udi_vendor_bulk_out_run(
+            xram + bulk_fpga_write_addr,
+            0xFFFFFFFF,
+            NULL);
 
     /* Transaction done in generic callback */
 }
@@ -301,7 +305,7 @@ void main_vendor_bulk_out_received(udd_ep_status_t status,
         if (FPGA_lockstatus() == fpga_blockout){
             FPGA_setlock(fpga_unlocked);
         }
-    } else if (blockendpoint_usage == bep_fpgabitstream){
+    } else if (blockendpoint_usage == bep_fpgabitstream) {
 
         /* Send byte to FPGA - this could eventually be done via SPI */		
         for(unsigned int i = 0; i < nb_transfered; i++){
@@ -313,10 +317,10 @@ void main_vendor_bulk_out_received(udd_ep_status_t status,
 
     //printf("BULKOUT: %d bytes\n", (int)nb_transfered);
 
-    udi_vendor_bulk_out_run(
-            main_buf_loopback,
-            sizeof(main_buf_loopback),
-            main_vendor_bulk_out_received);
+    // udi_vendor_bulk_out_run(
+    //         main_buf_loopback,
+    //         sizeof(main_buf_loopback),
+    //         main_vendor_bulk_out_received);
 }
 
 static void ctrl_cdce906_cb(void)
@@ -387,7 +391,7 @@ static void ctrl_vccint_cb(void)
     return;
 }
 
-static void ctrl_fpgaioutil(void){
+static void ctrl_fpgaioutil(void) {
 	
     if (udd_g_ctrlreq.req.wLength != 2){
         return;

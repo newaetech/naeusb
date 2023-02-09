@@ -115,6 +115,10 @@ void openadc_readmem_ctrl(void)
 
     /* Set size to read */
     ctrlmemread_size = buflen;
+    udi_vendor_bulk_out_run(
+        xram,
+        0xFFFFFFFF,
+        NULL);
 
     /* Start Transaction */
     
@@ -170,10 +174,10 @@ void main_vendor_bulk_out_received(udd_ep_status_t status,
         // Transfer aborted
 
         //restart
-        udi_vendor_bulk_out_run(
-            main_buf_loopback,
-            sizeof(main_buf_loopback),
-            main_vendor_bulk_out_received);
+        // udi_vendor_bulk_out_run(
+        //     main_buf_loopback,
+        //     sizeof(main_buf_loopback),
+        //     main_vendor_bulk_out_received);
 
         return;
     }
@@ -204,10 +208,10 @@ void main_vendor_bulk_out_received(udd_ep_status_t status,
 
     //printf("BULKOUT: %d bytes\n", (int)nb_transfered);
 
-    udi_vendor_bulk_out_run(
-        main_buf_loopback,
-        sizeof(main_buf_loopback),
-        main_vendor_bulk_out_received);
+    // udi_vendor_bulk_out_run(
+    //     main_buf_loopback,
+    //     sizeof(main_buf_loopback),
+    //     main_vendor_bulk_out_received);
 }
 
 bool openadc_setup_in_received(void)

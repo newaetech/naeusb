@@ -53,6 +53,13 @@ void smc_normaltiming(void);
 #define PSRAM_BASE_ADDRESS         (0x60000000)
 extern uint8_t volatile *xram;
 
+typedef enum {
+    bep_emem=0,
+    bep_fpgabitstream=10,
+    bep_fpgabitstreamspi=20
+} blockep_usage_t;
+
+extern blockep_usage_t blockendpoint_usage;
 //#define FPGA_ADDR_PINS (PIO_PB0 | PIO_PB1 | PIO_PB2 | PIO_PB3 | PIO_PB4 | PIO_PB5 | PIO_PB7 | PIO_PB8 )
 //#define FPGA_ADDR_PORT PIOB
 

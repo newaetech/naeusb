@@ -70,10 +70,10 @@ bool main_vendor_enable(void)
     // Start data reception on OUT endpoints
 // #if UDI_VENDOR_EPS_SIZE_BULK_FS
 //     //main_vendor_bulk_in_received(UDD_EP_TRANSFER_OK, 0, 0);
-    udi_vendor_bulk_out_run(
-        main_buf_loopback,
-        sizeof(main_buf_loopback),
-        main_vendor_bulk_out_received);
+    // udi_vendor_bulk_out_run(
+    //     main_buf_loopback,
+    //     sizeof(main_buf_loopback),
+    //     main_vendor_bulk_out_received);
 // #endif
     return true;
 }
