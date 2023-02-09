@@ -23,9 +23,9 @@
 #include "usb_xmem.h"
 
 extern blockep_usage_t blockendpoint_usage;
+#define PROG_BUF_SIZE 1024
 
 #ifdef SERIAL_PROG_DMA
-#define PROG_DMA_BUF_SIZE 1024
 
 #if FPGA_USE_BITBANG
 #error "DMA not available when programming via bitbang"
@@ -49,7 +49,7 @@ enum dma_prog_buf_state {
 };
 
 struct dma_prog_buf {
-    COMPILER_WORD_ALIGNED volatile uint8_t buf[PROG_DMA_BUF_SIZE];
+    COMPILER_WORD_ALIGNED volatile uint8_t buf[PROG_BUF_SIZE];
     uint16_t buflen;
     enum dma_prog_buf_state state;
 };
@@ -72,7 +72,7 @@ void DMA_init(void)
 
     // start reading data in
     udi_vendor_bulk_out_run(dma_prog_buffers[usb_current_buffer].buf, 
-        PROG_DMA_BUF_SIZE, fpga_prog_bulk_out_received);
+        PROG_BUF_SIZE, fpga_prog_bulk_out_received);
 }
 
 // we're done now, shut er down
@@ -117,7 +117,7 @@ ISR(USART2_Handler)
 
             // this buffer is empty, so load some USB data into it
             udi_vendor_bulk_out_run(dma_prog_buffers[usart_current_buffer].buf, 
-                PROG_DMA_BUF_SIZE, fpga_prog_bulk_out_received);
+                PROG_BUF_SIZE, fpga_prog_bulk_out_received);
             dma_prog_buffers[usart_current_buffer].state = DMA_PROG_BUF_FILLING;
 
             // other buffer is now being sent out over usart, this one is being filled by USB data
@@ -127,7 +127,7 @@ ISR(USART2_Handler)
         } else if (dma_prog_buffers[usb_current_buffer].state == DMA_PROG_BUF_EMPTY) {
             // this shouldn't happen, but if both buffers are empty, fill this one
             udi_vendor_bulk_out_run(dma_prog_buffers[usart_current_buffer].buf, 
-                PROG_DMA_BUF_SIZE, fpga_prog_bulk_out_received);
+                PROG_BUF_SIZE, fpga_prog_bulk_out_received);
             dma_prog_buffers[usart_current_buffer].state = DMA_PROG_BUF_FILLING;
 
             // other buffer is still empty, this one is being filled by USB data
@@ -160,7 +160,7 @@ void fpga_prog_bulk_out_received(udd_ep_status_t status,
 
         // other buffer is empty, so read data into it
         udi_vendor_bulk_out_run(dma_prog_buffers[usart_current_buffer].buf, 
-            PROG_DMA_BUF_SIZE, fpga_prog_bulk_out_received);
+            PROG_BUF_SIZE, fpga_prog_bulk_out_received);
         dma_prog_buffers[usart_current_buffer].state = DMA_PROG_BUF_FILLING;
 
         // this buffer is full, so start sending out the bitstream
@@ -188,6 +188,25 @@ void fpga_prog_bulk_out_received(udd_ep_status_t status,
         // in any case, we don't have anything to do
         return;
     }
+}
+#else
+
+COMPILER_WORD_ALIGNED volatile uint8_t fpga_prog_buf[PROG_BUF_SIZE];
+void fpga_prog_bulk_out_received(udd_ep_status_t status,
+                                   iram_size_t nb_transfered, udd_ep_id_t ep)
+{
+    if (UDD_EP_TRANSFER_OK != status) {
+        // Transfer aborted
+        return;
+    }
+
+    for(unsigned int i = 0; i < nb_transfered; i++){
+        fpga_program_sendbyte(fpga_prog_buf[i]);
+    }
+	udi_vendor_bulk_out_run(
+			fpga_prog_buf,
+			PROG_BUF_SIZE,
+			fpga_prog_bulk_out_received);
 }
 #endif
 
@@ -293,11 +312,15 @@ void fpga_program_setup2(void)
 	#ifdef SERIAL_PROG_DMA
 	DMA_init();
 	#else
+	// udi_vendor_bulk_out_run(
+	// 		main_buf_loopback,
+	// 		sizeof(main_buf_loopback),
+	// 		main_vendor_bulk_out_received);
 	udi_vendor_bulk_out_run(
-			main_buf_loopback,
-			sizeof(main_buf_loopback),
-			main_vendor_bulk_out_received);
-	blockendpoint_usage = bep_fpgabitstream;
+			fpga_prog_buf,
+			PROG_BUF_SIZE,
+			fpga_prog_bulk_out_received);
+	// blockendpoint_usage = bep_fpgabitstream;
 	#endif
 }
 
@@ -330,12 +353,14 @@ void fpga_program_sendbyte(uint8_t databyte)
 	#endif
 }
 
+
 void fpga_program_finish(void)
 {
 	#ifdef SERIAL_PROG_DMA
 		DMA_shutdown();
 	#endif
-	blockendpoint_usage = bep_emem;
+	// blockendpoint_usage = bep_emem;
+	udd_ep_abort(UDI_VENDOR_EP_BULK_OUT);
 	// udi_vendor_bulk_out_run(
 	// 		main_buf_loopback,
 	// 		sizeof(main_buf_loopback),

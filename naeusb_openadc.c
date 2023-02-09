@@ -16,7 +16,7 @@ static unsigned int ctrlmemread_size;
 
 void openadc_progfpga_bulk(void){
 	uint32_t prog_freq = 10E6;
-    switch(udd_g_ctrlreq.req.wValue){
+    switch(udd_g_ctrlreq.req.wValue & 0xFF){
     case 0xA0:
         
         if (udd_g_ctrlreq.req.wLength == 4) {
@@ -28,12 +28,13 @@ void openadc_progfpga_bulk(void){
     case 0xA1:
         /* Waiting on data... */
         fpga_program_setup2();
-        blockendpoint_usage = bep_fpgabitstream;
+        // blockendpoint_usage = bep_fpgabitstream;
         break;
 
     case 0xA2:
         /* Done */
-        blockendpoint_usage = bep_emem;
+        // blockendpoint_usage = bep_emem;
+        fpga_program_finish();
         break;
 
     case 0xB0:
