@@ -372,8 +372,15 @@ uint32_t twi_master_write(Twi *p_twi, twi_packet_t *p_packet)
 	p_twi->TWI_IADR = twi_mk_addr(p_packet->addr, p_packet->addr_length);
 
 	/* Send all bytes */
+	#ifdef TWI_TIMEOUT
+	uint32_t timeout = 0;
+	#endif
 
 	while (cnt > 0) {
+		#ifdef TWI_TIMEOUT
+		if (timeout++ > TWI_TIMEOUT)
+			return TWI_ERROR_TIMEOUT;
+		#endif
 
 		status = p_twi->TWI_SR;
 		if (status & TWI_SR_NACK) {
@@ -388,9 +395,6 @@ uint32_t twi_master_write(Twi *p_twi, twi_packet_t *p_packet)
 		cnt--;
 	}
 
-	#ifdef TWI_TIMEOUT
-	uint32_t timeout = 0;
-	#endif
 	while (1) {
 		#ifdef TWI_TIMEOUT
 		if (timeout++ > TWI_TIMEOUT)
