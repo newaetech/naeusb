@@ -209,6 +209,7 @@ usart_driver usart0_driver = {
     .cdc_settings_change = 1,
 
 };
+
 ISR(USART0_Handler)
 {
 	generic_isr(&usart0_driver);

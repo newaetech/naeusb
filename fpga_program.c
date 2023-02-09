@@ -59,8 +59,8 @@ static struct dma_prog_buf dma_prog_buffers[2]; //should be zero'd
 // init buffers and setup bulk read into buffers
 void DMA_init(void)
 {
-    NVIC_EnableIRQ(USART2_IRQn);
-    // usart_enable_interrupt(USART2, UART_IER_TXBUFE); // this fires if the buffer is ever empty
+    // NVIC_EnableIRQ();
+    // usart_enable_interrupt(FPGA_PROG_USART, UART_IER_TXBUFE); // this fires if the buffer is ever empty
 
     dma_prog_buffers[0].buflen = 0;
     dma_prog_buffers[0].state = DMA_PROG_BUF_EMPTY;
@@ -78,16 +78,16 @@ void DMA_init(void)
 // we're done now, shut er down
 void DMA_shutdown(void)
 {
-    NVIC_DisableIRQ(USART2_IRQn);
-    usart_disable_interrupt(USART2, US_IDR_TXBUFE);
-    Pdc *usart_pdc = usart_get_pdc_base(USART2);
+    // NVIC_DisableIRQ(FPGA_PROG_USART_IRQn);
+    usart_disable_interrupt(FPGA_PROG_USART, US_IDR_TXBUFE);
+    Pdc *usart_pdc = usart_get_pdc_base(FPGA_PROG_USART);
     pdc_disable_transfer(usart_pdc, PERIPH_PTCR_TXTDIS);
 }
 
 // setup actual DMA
 void setup_usart_DMA(uint8_t *buf, uint16_t buflen)
 {
-    Pdc *usart_pdc = usart_get_pdc_base(USART2);
+    Pdc *usart_pdc = usart_get_pdc_base(FPGA_PROG_USART);
     pdc_packet_t usart_packet;
 
     usart_packet.ul_addr = (uint32_t)buf;
@@ -95,16 +95,16 @@ void setup_usart_DMA(uint8_t *buf, uint16_t buflen)
 
     pdc_tx_init(usart_pdc, &usart_packet, NULL);
     pdc_enable_transfer(usart_pdc, PERIPH_PTCR_TXTEN);
-    usart_enable_interrupt(USART2, US_IER_TXBUFE);
+    usart_enable_interrupt(FPGA_PROG_USART, US_IER_TXBUFE);
 }
 
 ISR(USART2_Handler)
 {
     uint32_t usart_status;
-    usart_status = usart_get_status(USART2);
-    Pdc *usart_pdc = usart_get_pdc_base(USART2);
+    usart_status = usart_get_status(FPGA_PROG_USART);
+    Pdc *usart_pdc = usart_get_pdc_base(FPGA_PROG_USART);
     if (usart_status & (US_CSR_TXBUFE)) {
-        usart_disable_interrupt(USART2, US_IDR_TXBUFE);
+        usart_disable_interrupt(FPGA_PROG_USART, US_IDR_TXBUFE);
         pdc_disable_transfer(usart_pdc, PERIPH_PTCR_TXTDIS);
         dma_prog_buffers[usart_current_buffer].state = DMA_PROG_BUF_EMPTY;
         dma_prog_buffers[usart_current_buffer].buflen = 0; //empty buffer
@@ -311,6 +311,7 @@ void fpga_program_setup2(void)
 
 	#ifdef SERIAL_PROG_DMA
 	DMA_init();
+    USART0_INT_HANDLER = usart_prog_handler;
 	#else
 	// udi_vendor_bulk_out_run(
 	// 		main_buf_loopback,
