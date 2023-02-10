@@ -311,7 +311,6 @@ void fpga_program_setup2(void)
 
 	#ifdef SERIAL_PROG_DMA
 	DMA_init();
-    USART0_INT_HANDLER = usart_prog_handler;
 	#else
 	// udi_vendor_bulk_out_run(
 	// 		main_buf_loopback,
