@@ -17,28 +17,21 @@
 
 #include <asf.h>
 #include "cdce906.h"
+#include "i2c_util.h"
 
 #define CDCE906_ADDR 0x69
 
-volatile uint8_t I2C_LOCK = 0;
+// volatile uint8_t I2C_LOCK = 0;
 
 /* Init the CDCE906 chip, set offline */
 bool cdce906_init(void)
 {
-	//gpio_configure_pin(PIN_CDCE_SDA, PIN_CDCE_SDA_FLAGS);
-	//gpio_configure_pin(PIN_CDCE_SCL, PIN_CDCE_SCL_FLAGS);
-	
-	twi_master_options_t opt = {
-		.speed = 50000,
-		.chip  = CDCE906_ADDR
-	};
-	
-	twi_master_setup(TWI0, &opt);
+	i2c_setup();
 	
 	uint8_t data = 0;
 	
 	/* Read addr 0 */
-	if (cdce906_read(0, &data) == false){
+	if (cdce906_read(0, &data) != 0){
 		return false;
 	}
 	
@@ -50,48 +43,12 @@ bool cdce906_init(void)
 	return false;
 }
 
-bool cdce906_write(uint8_t addr, uint8_t data)
+int cdce906_write(uint8_t addr, uint8_t data)
 {
-	if (I2C_LOCK) {
-		return false;
-	}
-	I2C_LOCK = 1;
-	twi_package_t packet_write = {
-		.addr         = {0x80 | addr},      // TWI slave memory address data
-		.addr_length  = 1,    // TWI slave memory address data size
-		.chip         = CDCE906_ADDR,      // TWI slave bus address
-		.buffer       = &data, // transfer data source buffer
-		.length       = 1  // transfer data size (bytes)
-	};
-	
-	if (twi_master_write(TWI0, &packet_write) == TWI_SUCCESS){
-		I2C_LOCK = 0;
-		return true;
-	} else {
-		I2C_LOCK = 0;
-		return false;
-	}
+	return i2c_write(CDCE906_ADDR, addr | 0x80, &data, 1);
 }
 
-bool cdce906_read(uint8_t addr, uint8_t * data)
+int cdce906_read(uint8_t addr, uint8_t * data)
 {
-	if (I2C_LOCK) {
-		return false;
-	}
-	I2C_LOCK = 1;
-	twi_package_t packet_read = {
-		.addr         = {0x80 | addr},      // TWI slave memory address data
-		.addr_length  = 1,    // TWI slave memory address data size
-		.chip         = CDCE906_ADDR,      // TWI slave bus address
-		.buffer       = data,        // transfer data destination buffer
-		.length       = 1,                    // transfer data size (bytes)
-	};
-	
-	if(twi_master_read(TWI0, &packet_read) == TWI_SUCCESS){
-		I2C_LOCK = 0;
-		return 1;
-	} else {
-		I2C_LOCK = 0;
-		return 0;
-	}	
+	return i2c_read(CDCE906_ADDR, addr | 0x80, data, 1);
 }

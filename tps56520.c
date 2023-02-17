@@ -17,6 +17,7 @@
 
 #include <asf.h>
 #include "tps56520.h"
+#include "i2c_util.h"
 
 #define TPS56520_ADDR 0x34
 
@@ -53,17 +54,13 @@ bool tps56520_detect(void)
 /* Set voltage in mV for FPGA VCC_INT Voltage */
 bool tps56520_set(uint16_t mv_output)
 {
-	if (I2C_LOCK) return false;
-	I2C_LOCK = 1;
 	/* Validate output voltage is in range */
 	if ((mv_output < 600) || (mv_output > 1800)){
-		I2C_LOCK = 0;
 		return false;
 	}
 	
 	/* Avoid frying FPGA */
 	if (mv_output > 1200){
-		I2C_LOCK = 0;
 		return false;
 	}
 	
@@ -72,38 +69,20 @@ bool tps56520_set(uint16_t mv_output)
 	if (!checkoddparity(setting)){
 		setting |= 1<<7;
 	}
-	twi_package_t packet_write = {
-		.addr         = {0,0,0},      // TWI slave memory address data
-		.addr_length  = 1,    // TWI slave memory address data size
-		.chip         = TPS56520_ADDR,      // TWI slave bus address
-		.buffer       = &setting, // transfer data source buffer
-		.length       = 1  // transfer data size (bytes)
-	};
-	
-	if (twi_master_write(TWI0, &packet_write) != TWI_SUCCESS){
-		I2C_LOCK = 0;
+
+	if (i2c_write(TPS56520_ADDR, 0, &setting, 1)) {
 		return false;
 	}
 	
 	uint8_t volt_read;
-	
-	twi_package_t packet_read = {
-		.addr         = {0,0,0},      // TWI slave memory address data
-		.addr_length  = 1,    // TWI slave memory address data size
-		.chip         = TPS56520_ADDR,      // TWI slave bus address
-		.buffer       = &volt_read,        // transfer data destination buffer
-		.length       = 1                    // transfer data size (bytes)
-	};
-	
-	if(twi_master_read(TWI0, &packet_read) != TWI_SUCCESS){
-		I2C_LOCK = 0;
+
+	if (i2c_read(TPS56520_ADDR, 0, &volt_read, 1)) {
 		return false;
 	}
 	
 	if (volt_read == setting){
-		I2C_LOCK = 0;
 		return true;
 	}
-	I2C_LOCK = 0;
+
 	return false;
 }

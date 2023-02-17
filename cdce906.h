@@ -19,8 +19,8 @@
 #define CDCE906_H_
 
 
-bool cdce906_write(uint8_t addr, uint8_t data);
-bool cdce906_read(uint8_t addr, uint8_t * data);
+int cdce906_write(uint8_t addr, uint8_t data);
+int cdce906_read(uint8_t addr, uint8_t * data);
 bool cdce906_init(void);
 
 
