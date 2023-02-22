@@ -222,7 +222,7 @@ all:
 	@$(MAKE) --no-print-directory -O end sizeafter
 
 # Change the build target to build a HEX file or a library.
-build: elf hex bin eep lss sym
+build: elf hex bin eep lss sym version
 
 beginmsg: begin gccversion
 #build: lib
@@ -373,6 +373,11 @@ $(OBJDIR)/%.o : %.S
 # Create preprocessed source for use in sending a bug report.
 %.i : %.c
 	$(CC) -E $(MCU_FLAGS) -I. $(CFLAGS) $< -o $@
+
+version :
+	@grep -o "FW_VER_MAJOR.*" ./config/conf_usb.h > version.txt
+	@grep -o "FW_VER_MINOR.*" ./config/conf_usb.h >> version.txt
+	@grep -o "FW_VER_DEBUG.*" ./config/conf_usb.h >> version.txt
 
 # Clean all object files specific to this platform
 clean_objs :
