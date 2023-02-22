@@ -29,3 +29,4 @@ bool main_vendor_enable(void);
 void main_vendor_disable(void);
 bool main_setup_out_received(void);
 bool main_setup_in_received(void);
+bool usb_is_enabled(void);
