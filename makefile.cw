@@ -219,10 +219,10 @@ ALL_ASFLAGS = $(MCU_FLAGS) -I. -x assembler-with-cpp $(ASFLAGS)
 all: 
 	@$(MAKE) --no-print-directory -O clean_objs .dep 
 	@$(MAKE) --no-print-directory -O begin build
-	@$(MAKE) --no-print-directory -O end sizeafter
+	@$(MAKE) --no-print-directory -O version end sizeafter
 
 # Change the build target to build a HEX file or a library.
-build: elf hex bin eep lss sym version
+build: elf hex bin eep lss sym
 
 beginmsg: begin gccversion
 #build: lib
@@ -375,9 +375,10 @@ $(OBJDIR)/%.o : %.S
 	$(CC) -E $(MCU_FLAGS) -I. $(CFLAGS) $< -o $@
 
 version :
-	@grep -o "FW_VER_MAJOR.*" ./config/conf_usb.h > version.txt
-	@grep -o "FW_VER_MINOR.*" ./config/conf_usb.h >> version.txt
-	@grep -o "FW_VER_DEBUG.*" ./config/conf_usb.h >> version.txt
+	@$(CC) -dD -E $(ALL_CFLAGS) ./config/conf_usb.h -o symbols.txt
+	@grep -o -m 1 "FW_VER_MAJOR.*" ./symbols.txt > version.txt
+	@grep -o -m 1 "FW_VER_MINOR.*" ./symbols.txt >> version.txt
+	@grep -o -m 1 "FW_VER_DEBUG.*" ./symbols.txt >> version.txt
 
 # Clean all object files specific to this platform
 clean_objs :
@@ -442,4 +443,4 @@ program :
 .PHONY : all allquick begin finish end sizeafter gccversion \
 build elf hex bin eep lss sym coff extcoff \
 clean clean_list clean_print clean_objs program debug gdb-config \
-fastnote
+fastnote version
