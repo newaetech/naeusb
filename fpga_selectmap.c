@@ -31,7 +31,10 @@ void fpga_selectmap_setup1(uint8_t bytemode, uint16_t SETUP_TIME)
     gpio_configure_pin(PIN_EBI_NRD, PIO_INPUT);
     gpio_configure_pin(PIN_EBI_NWE, PIN_EBI_NWE_FLAGS);
     gpio_configure_pin(PIN_EBI_NCS0, PIN_EBI_NCS0_FLAGS);
+
+    #ifdef PIN_CFG_RDRW
     gpio_configure_pin(PIN_CFG_RDRW, PIN_CFG_RDRW_PIO_PC1_FLAGS);
+    #endif
 
 	pmc_enable_periph_clk(ID_SMC);
 	smc_set_setup_timing(SMC, 0, SMC_SETUP_NWE_SETUP(SETUP_TIME)
