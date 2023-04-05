@@ -27,14 +27,14 @@
 bool cdce906_init(void)
 {
 	i2c_setup();
-	
+
 	uint8_t data = 0;
-	
+
 	/* Read addr 0 */
 	if (cdce906_read(0, &data) != 0){
 		return false;
 	}
-	
+
 	/* Check vendor ID matches expected */
 	if ((data & 0x0F) == 0x01){
 		return true;
@@ -45,10 +45,12 @@ bool cdce906_init(void)
 
 int cdce906_write(uint8_t addr, uint8_t data)
 {
+	/* bit 7 of reg address set to 1 = byte mode*/
 	return i2c_write(CDCE906_ADDR, addr | 0x80, &data, 1);
 }
 
 int cdce906_read(uint8_t addr, uint8_t * data)
 {
+	/* bit 7 of reg address set to 1 = byte mode*/
 	return i2c_read(CDCE906_ADDR, addr | 0x80, data, 1);
 }
