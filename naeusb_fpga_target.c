@@ -45,17 +45,17 @@ void main_vendor_bulk_out_received(udd_ep_status_t status,
 bool fpga_target_setup_in_received(void);
 
 void ctrl_readmem_bulk(void){
-    uint32_t buflen = *(CTRLBUFFER_WORDPTR);	
+    uint32_t buflen = *(CTRLBUFFER_WORDPTR);
     uint32_t address = *(CTRLBUFFER_WORDPTR + 1);
 
     FPGA_setlock(fpga_blockin);
 
-    /* Do memory read */	
+    /* Do memory read */
     udi_vendor_bulk_in_run(
             (uint8_t *) PSRAM_BASE_ADDRESS + address,
             buflen,
             main_vendor_bulk_in_received
-            );	
+            );
 }
 
 void ctrl_readmem_ctrl(void){
@@ -118,17 +118,17 @@ void ctrl_writemem_ctrl_sam3u(void){
 }
 
 static void ctrl_spi1util(void){
-	
-    
+
+
 	switch(udd_g_ctrlreq.req.wValue){
 		case 0xA0:
-			spi1util_init();			
+			spi1util_init();
 			break;
-			
+
 		case 0xA1:
 			spi1util_deinit();
 			break;
-			
+
 		case 0xA2:
 			spi1util_cs_low();
 			break;
@@ -158,16 +158,16 @@ static void ctrl_spi1util(void){
 }
 
 static void ctrl_progfpgaspi(void){
-	
+
 	switch(udd_g_ctrlreq.req.wValue){
 		case 0xA0:
-			fpgaspi_program_init();			
+			fpgaspi_program_init();
 			break;
-			
+
 		case 0xA1:
 			fpgaspi_program_deinit();
 			break;
-			
+
 		case 0xA2:
 			fpgaspi_cs_low();
 			break;
@@ -248,9 +248,9 @@ void main_vendor_bulk_in_received(udd_ep_status_t status,
     UNUSED(ep);
     if (UDD_EP_TRANSFER_OK != status) {
         return; // Transfer aborted/error
-    }	
+    }
 
-    if (FPGA_lockstatus() == fpga_blockin){		
+    if (FPGA_lockstatus() == fpga_blockin){
         FPGA_setlock(fpga_unlocked);
     }
 }
@@ -262,7 +262,7 @@ void ctrl_progfpga_bulk(void){
             if (udd_g_ctrlreq.req.wLength == 4) {
                 prog_freq = *(CTRLBUFFER_WORDPTR);
             }
-            fpga_program_setup1(prog_freq);			
+            fpga_program_setup1(prog_freq);
             break;
 
         case 0xA1:
@@ -307,7 +307,7 @@ void main_vendor_bulk_out_received(udd_ep_status_t status,
         }
     } else if (blockendpoint_usage == bep_fpgabitstream) {
 
-        /* Send byte to FPGA - this could eventually be done via SPI */		
+        /* Send byte to FPGA - this could eventually be done via SPI */
         for(unsigned int i = 0; i < nb_transfered; i++){
             fpga_program_sendbyte(main_buf_loopback[i]);
         }
@@ -339,12 +339,12 @@ static void ctrl_cdce906_cb(void)
 
     cdce906_status = USB_STATUS_COMMERR;
     if (udd_g_ctrlreq.payload[0] == 0x00){
-        if (cdce906_read(udd_g_ctrlreq.payload[1], &cdce906_data)){
+        if (cdce906_read(udd_g_ctrlreq.payload[1], &cdce906_data) == 0){
             cdce906_status = USB_STATUS_OK;
         }
 
     } else if (udd_g_ctrlreq.payload[0] == 0x01){
-        if (cdce906_write(udd_g_ctrlreq.payload[1], udd_g_ctrlreq.payload[2])){
+        if (cdce906_write(udd_g_ctrlreq.payload[1], udd_g_ctrlreq.payload[2]) == 0){
             cdce906_status = USB_STATUS_OK;
         }
     } else {
@@ -392,7 +392,7 @@ static void ctrl_vccint_cb(void)
 }
 
 static void ctrl_fpgaioutil(void) {
-	
+
     if (udd_g_ctrlreq.req.wLength != 2){
         return;
     }
@@ -444,7 +444,7 @@ static void ctrl_fpgaioutil(void) {
                         gpio_configure_pin(pin_spi1_cs, PIO_DEFAULT);
                     }
                     gpio_configure_pin(pin, PIO_OUTPUT_1);
-                    pin_spi1_cs = pin;                    
+                    pin_spi1_cs = pin;
                     break;
                 default:
                     //oops?
@@ -452,7 +452,7 @@ static void ctrl_fpgaioutil(void) {
                     break;
             }
 			break;
-			
+
 		case 0xA1: /* Release IO Pin */
 			//todo?
             gpio_configure_pin(pin, PIO_DEFAULT);
@@ -518,9 +518,9 @@ bool fpga_target_setup_in_received(void)
             udd_g_ctrlreq.payload = respbuf;
             udd_g_ctrlreq.payload_size = 3;
             return true;
-            break;	
+            break;
 
-		case REQ_FPGASPI_PROGRAM:						
+		case REQ_FPGASPI_PROGRAM:
 			if (udd_g_ctrlreq.req.wLength > sizeof(fpgaspi_data_buffer))
             {
                 return false;
@@ -538,8 +538,8 @@ bool fpga_target_setup_in_received(void)
 			udd_g_ctrlreq.payload = spi1util_data_buffer;
 			udd_g_ctrlreq.payload_size = udd_g_ctrlreq.req.wLength;
 			return true;
-			break;    
-			
+			break;
+
 		case REQ_FPGAIO_UTIL:
 			0;
 			int pin;
@@ -582,12 +582,12 @@ void fpga_target_sam_cfg_out(void)
 	    delay_cycles(250);
 	    gpio_set_pin_low(FPGA_TRIGGER_GPIO);
 	    break;
-	        
+
 	    /* Turn target power off */
 	    case 0x07:
 	    kill_fpga_power();
 	    break;
-	        
+
 	    /* Turn target power on */
 	    case 0x08:
 	    enable_fpga_power();
@@ -615,7 +615,7 @@ bool fpga_target_setup_out_received(void)
             return true;
         case REQ_MEMREAD_CTRL:
             udd_g_ctrlreq.callback = ctrl_readmem_ctrl;
-            return true;	
+            return true;
 
             /* Memory Write */
         case REQ_MEMWRITE_BULK:
@@ -624,11 +624,11 @@ bool fpga_target_setup_out_received(void)
 
         case REQ_MEMWRITE_CTRL:
             udd_g_ctrlreq.callback = ctrl_writemem_ctrl;
-            return true;		
+            return true;
 
         case REQ_MEMWRITE_CTRL_SAMU3:
             udd_g_ctrlreq.callback = ctrl_writemem_ctrl_sam3u;
-            return true;		
+            return true;
 
             /* Send bitstream to FPGA */
         case REQ_FPGA_PROGRAM:
@@ -672,7 +672,7 @@ bool fpga_target_setup_out_received(void)
 
         default:
             return false;
-    }					
+    }
 }
 
 void fpga_target_register_handlers(void)
