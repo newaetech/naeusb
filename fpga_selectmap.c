@@ -5,6 +5,8 @@
 #define PULSE_TIME SETUP_TIME*2
 #define CYCLE_TIME (4*SETUP_TIME)
 
+void setup_fpga_rw(void);
+
 void fpga_selectmap_setup1(uint8_t bytemode, uint16_t SETUP_TIME)
 {
     //make sure usart pins are high-z
@@ -87,20 +89,7 @@ void fpga_selectmap_setup3(void)
     gpio_configure_pin(PIN_EBI_NWE, PIN_EBI_NWE_FLAGS);
     gpio_configure_pin(PIN_EBI_NCS0, PIN_EBI_NCS0_FLAGS);
 
-	pmc_enable_periph_clk(ID_SMC);
-	smc_set_setup_timing(SMC, 0, SMC_SETUP_NWE_SETUP(2)
-	| SMC_SETUP_NCS_WR_SETUP(3)
-	| SMC_SETUP_NRD_SETUP(2)
-	| SMC_SETUP_NCS_RD_SETUP(3));
-	smc_set_pulse_timing(SMC, 0, SMC_PULSE_NWE_PULSE(6)
-	| SMC_PULSE_NCS_WR_PULSE(2)
-	| SMC_PULSE_NRD_PULSE(6)
-	| SMC_PULSE_NCS_RD_PULSE(6));
-	smc_set_cycle_timing(SMC, 0, SMC_CYCLE_NWE_CYCLE(12)
-	| SMC_CYCLE_NRD_CYCLE(12));
-
-    smc_set_mode(SMC, 0, SMC_MODE_READ_MODE | SMC_MODE_WRITE_MODE
-        | SMC_MODE_DBW_BIT_8);
+    setup_fpga_rw(); // needs to be defined elsewhere. For Luna, this is in naeusb_luna.c
 }
 // done by DMA
 // void fpga_selectmap_sendbyte(uint8_t databyte)

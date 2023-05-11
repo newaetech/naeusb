@@ -52,6 +52,7 @@ void smc_normaltiming(void);
 /* Access pointer for FPGA Interface */
 #define PSRAM_BASE_ADDRESS         (0x60000000)
 extern uint8_t volatile *xram;
+extern uint16_t volatile *xram16;
 
 typedef enum {
     bep_emem=0,
