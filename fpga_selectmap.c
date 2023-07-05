@@ -51,11 +51,9 @@ void fpga_selectmap_setup1(uint8_t bytemode, uint16_t SETUP_TIME)
 	| SMC_CYCLE_NRD_CYCLE(12));
 
     if (bytemode == 0) {
-        smc_set_mode(SMC, 0, SMC_MODE_WRITE_MODE
-            | SMC_MODE_DBW_BIT_8 | SMC_MODE_WRITE_MODE_NWE_CTRL);
+        smc_set_mode(SMC, 0, SMC_MODE_DBW_BIT_8 | SMC_MODE_WRITE_MODE_NWE_CTRL);
     } else {
-        smc_set_mode(SMC, 0, SMC_MODE_WRITE_MODE
-            | SMC_MODE_DBW_BIT_16 | SMC_MODE_WRITE_MODE_NWE_CTRL);
+        smc_set_mode(SMC, 0, SMC_MODE_DBW_BIT_16 | SMC_MODE_WRITE_MODE_NWE_CTRL);
     }
 }
 
