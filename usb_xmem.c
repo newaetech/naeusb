@@ -92,7 +92,7 @@ void FPGA_setaddr(uint32_t addr)
         PIN_EBI_DATA_BUS_D15
       };
       for (uint8_t i = 0; i < 8; i++) {
-        gpio_configure_pin(addr_pins[i], (addr & i) ? PIO_OUTPUT_1 : PIO_OUTPUT_0);
+        gpio_configure_pin(addr_pins[i], (addr & (1 << i)) ? PIO_OUTPUT_1 : PIO_OUTPUT_0);
       }
 			gpio_set_pin_low(FPGA_ALE_GPIO);
 			gpio_set_pin_high(FPGA_ALE_GPIO);
