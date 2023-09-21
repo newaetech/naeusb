@@ -232,7 +232,7 @@ ISR(USART0_Handler)
 void usart0_enableIO(void)
 {
 	sysclk_enable_peripheral_clock(ID_USART0);
-	#if USB_DEVICE_PRODUCT_ID != 0xC310
+	#if (USB_DEVICE_PRODUCT_ID != 0xC310) && (USB_DEVICE_PRODUCT_ID != 0xC340)
 	gpio_configure_pin(PIN_USART0_RXD, PIN_USART0_RXD_FLAGS);
 	gpio_configure_pin(PIN_USART0_TXD, PIN_USART0_TXD_FLAGS);
 	#endif
@@ -262,7 +262,7 @@ void usart1_enableIO(void)
 {
 	sysclk_enable_peripheral_clock(ID_USART1);
 	
-	#if USB_DEVICE_PRODUCT_ID != 0xC310
+	#if (USB_DEVICE_PRODUCT_ID != 0xC310) && (USB_DEVICE_PRODUCT_ID != 0xC340)
 	gpio_configure_pin(PIN_USART1_RXD_IDX, PIN_USART1_RXD_FLAGS);
 	gpio_configure_pin(PIN_USART1_TXD_IDX, PIN_USART1_TXD_FLAGS);
 	#endif

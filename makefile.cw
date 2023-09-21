@@ -100,6 +100,12 @@ else ifeq ($(HAL),SAM4S)
 	EXTRAINCDIRS += naeusb/sam4s_hal/inc
 else ifeq ($(HAL),SAM3X)
 	SRC += $(wildcard naeusb/sam3x_hal/*.c)
+	ifeq ($(CDC),YES)
+		SRC += naeusb/sam3x_hal/usb_cdc/udi_cdc.c
+		SRC += naeusb/sam3x_hal/usb_cdc/udi_composite_desc.c
+	else
+		SRC += naeusb/sam3x_hal/usb_no_cdc/udi_vendor_desc.c
+	endif
 	EXTRAINCDIRS += naeusb/sam3x_hal/inc
 endif
 ##### 

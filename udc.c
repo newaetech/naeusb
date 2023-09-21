@@ -1112,6 +1112,10 @@ bool udc_process_setup(void)
 			// CompatibleID = "WINUSB"
 			MS_OS_DESC.FUNC[1].FEAT.CompatibleID[0] = 'W';
 		}
+#elif USB_DEVICE_NB_INTERFACE > 1
+		// Handle case where MPSSE isn't supported and there's more than one interface
+		// AKA CW340
+		MS_OS_DESC.FUNC[1].FEAT.CompatibleID[0] = 'M';
 #endif
 		udd_set_setup_payload((uint8_t *)&MS_OS_DESC, sizeof(struct MS_OS_DESC_SET_HEADER));
 		return true;
