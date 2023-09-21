@@ -17,6 +17,7 @@ typedef struct {
 	tcirc_buf txbuf;
 	tcirc_buf rx_cdc_buf;
 	int usart_id;
+	int cdc_port;
 	uint8_t cdc_supported:1;
 	uint8_t enabled:1;
 	uint8_t cdc_enabled:1;
