@@ -69,12 +69,14 @@ else ifeq ($(TARGET),CW310)
 	CFLAGS += -D__SAM3X8E__
 	CFLAGS += -D__PLAT_CW310__
 	CDC=YES
+	PROGCMD="import sys, time; assert len(sys.argv) > 1; import chipwhisperer as cw; exec('try: scope = cw.target(None, cw.targets.CW310); p = cw.SAMFWLoader(scope); p.enter_bootloader(True); time.sleep(2);\nexcept: pass'); cw.program_sam_firmware(fw_path=sys.argv[1])" $(TARGET).bin
 else ifeq ($(TARGET),CW340)
 # same for now, might be different at some point?
 	HAL = SAM3X
 	CFLAGS += -D__PLAT_CW340__
 	CFLAGS += -D__SAM3X8E__
 	CDC=YES
+	PROGCMD="import sys, time; assert len(sys.argv) > 1; import chipwhisperer as cw; exec('try: scope = cw.target(None, cw.targets.CW340); p = cw.SAMFWLoader(scope); p.enter_bootloader(True); time.sleep(2);\nexcept: pass'); cw.program_sam_firmware(fw_path=sys.argv[1])" $(TARGET).bin
 else ifeq ($(TARGET),phywhisperer)
 	CFLAGS += -D__SAM3U2E__
 	CFLAGS += -D__PLAT_PHY__
