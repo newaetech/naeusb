@@ -29,4 +29,4 @@ void naeusart_register_handlers(void);
 usart_driver *get_usart_from_id(int id);
 usart_driver *get_nth_available_driver(int id);
 
-void cdc_send_to_pc(void);
+// void cdc_send_to_pc(void);

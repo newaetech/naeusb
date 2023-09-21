@@ -1103,6 +1103,15 @@ bool udc_process_setup(void)
 	// MS requests this using request type 0xC0 and our user defined bRequest (0x01 in our case)
 	if ((udd_g_ctrlreq.req.bmRequestType == 0xC0) && (udd_g_ctrlreq.req.bRequest == 0x01)) {
 
+		for (uint8_t i = 0; i < USB_DEVICE_NB_INTERFACE; i++) {
+			MS_OS_DESC.FUNC[i] = (struct MS_FUNC_SUBSET_HEADER)MAKE_FUNC_SUBSET_HEADER(i);
+
+			// assume only interface 0 is vendor
+			if (i > 0) {
+				MS_OS_DESC.FUNC[i].FEAT.CompatibleID[0] = 'M';
+			}
+		}
+
 		// Hack to apply WinUSB to interface 1 IFF mpsse is enabled
 #if NAEUSB_MPSSE_SUPPORT == 1
 		if (!mpsse_enabled()) {
