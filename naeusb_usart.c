@@ -232,16 +232,34 @@ ISR(USART0_Handler)
 void usart0_enableIO(void)
 {
 	sysclk_enable_peripheral_clock(ID_USART0);
-	#if (USB_DEVICE_PRODUCT_ID != 0xC310) && (USB_DEVICE_PRODUCT_ID != 0xC340)
-	gpio_configure_pin(PIN_USART0_RXD, PIN_USART0_RXD_FLAGS);
-	gpio_configure_pin(PIN_USART0_TXD, PIN_USART0_TXD_FLAGS);
+	#if (USB_DEVICE_PRODUCT_ID == 0xC310) || (USB_DEVICE_PRODUCT_ID == 0xC340)
+    if (FPGA_PINS_ON) {
+        gpio_configure_pin(PIN_USART0_RXD, PIN_USART0_RXD_FLAGS);
+        gpio_configure_pin(PIN_USART0_TXD, PIN_USART0_TXD_FLAGS);
+    }
+    #else
+        gpio_configure_pin(PIN_USART0_RXD, PIN_USART0_RXD_FLAGS);
+        gpio_configure_pin(PIN_USART0_TXD, PIN_USART0_TXD_FLAGS);
 	#endif
 	irq_register_handler(USART0_IRQn, 3);
+}
+
+void usart0_tx_break(void)
+{
+	#if (USB_DEVICE_PRODUCT_ID == 0xC310) || (USB_DEVICE_PRODUCT_ID == 0xC340)
+    if (FPGA_PINS_ON) {
+        gpio_configure_pin(PIN_USART0_TXD, PIO_OUTPUT_0 | PIO_DEFAULT);
+    }
+    #endif
 }
 #else
 void usart0_enableIO(void)
 {
 	
+}
+void usart0_tx_break(void)
+{
+
 }
 #endif
 
@@ -268,10 +286,18 @@ void usart1_enableIO(void)
 	#endif
 	irq_register_handler(USART1_IRQn, 3);
 }
+void usart1_tx_break(void)
+{
+	gpio_configure_pin(PIN_USART1_TXD, PIO_OUTPUT_0 | PIO_DEFAULT);
+}
 #else
 void usart1_enableIO(void)
 {
 	
+}
+void usart1_tx_break(void)
+{
+
 }
 #endif
 
@@ -286,6 +312,10 @@ ISR(USART2_Handler)
 }
 #else
 void usart2_enableIO(void)
+{
+	
+}
+void usart2_tx_break(void)
 {
 	
 }
@@ -312,10 +342,18 @@ void usart3_enableIO(void)
 	gpio_configure_pin(PIN_USART3_TXD, PIN_USART3_TXD_FLAGS);
 	irq_register_handler(USART3_IRQn, 3);
 }
+void usart3_tx_break(void)
+{
+	gpio_configure_pin(PIN_USART3_TXD, PIO_OUTPUT_0 | PIO_DEFAULT);
+}
 #else
 void usart3_enableIO(void)
 {
 	
+}
+void usart3_tx_break(void)
+{
+
 }
 #endif
 
@@ -335,6 +373,20 @@ void usart_enableIO(usart_driver *driver)
         usart2_enableIO();
     } else if (driver->usart_id == 3) {
         usart3_enableIO();
+    }
+}
+
+// Set TX pin low for a given driver
+void usart_tx_break(usart_driver *driver)
+{
+    if (driver->usart_id == 0) {
+        usart0_tx_break();
+    } else if (driver->usart_id == 1) {
+        usart1_tx_break();
+    } else if (driver->usart_id == 2) {
+        usart2_tx_break();
+    } else if (driver->usart_id == 3) {
+        usart3_tx_break();
     }
 }
 
@@ -885,6 +937,23 @@ bool usart_setup_in_received(void)
         break;
     }
     return false;
+}
+
+bool naeusb_cdc_handle_send_break(uint8_t port, uint16_t wValue)
+{
+    usart_driver *driver = get_nth_available_driver(udd_g_ctrlreq.req.wValue >> 8);
+    if (!driver) return false;
+
+    switch(wValue) {
+        case 0xFFFF:
+            usart_tx_break(driver);
+            return true;
+        case 0x0000:
+            usart_enableIO(driver);
+            return true;
+        default:
+        return true;
+    }
 }
 
 // previously we handled SAM->PC CDC here. We no longer do this
