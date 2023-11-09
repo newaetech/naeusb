@@ -279,16 +279,25 @@ ISR(USART1_Handler)
 void usart1_enableIO(void)
 {
 	sysclk_enable_peripheral_clock(ID_USART1);
-	
-	#if (USB_DEVICE_PRODUCT_ID != 0xC310) && (USB_DEVICE_PRODUCT_ID != 0xC340)
-	gpio_configure_pin(PIN_USART1_RXD_IDX, PIN_USART1_RXD_FLAGS);
-	gpio_configure_pin(PIN_USART1_TXD_IDX, PIN_USART1_TXD_FLAGS);
+	#if (USB_DEVICE_PRODUCT_ID == 0xC310) || (USB_DEVICE_PRODUCT_ID == 0xC340)
+    if (FPGA_PINS_ON) {
+        gpio_configure_pin(PIN_USART1_RXD, PIN_USART1_RXD_FLAGS);
+        gpio_configure_pin(PIN_USART1_TXD, PIN_USART1_TXD_FLAGS);
+    }
+    #else
+        gpio_configure_pin(PIN_USART1_RXD, PIN_USART1_RXD_FLAGS);
+        gpio_configure_pin(PIN_USART1_TXD, PIN_USART1_TXD_FLAGS);
 	#endif
 	irq_register_handler(USART1_IRQn, 3);
 }
+
 void usart1_tx_break(void)
 {
-	gpio_configure_pin(PIN_USART1_TXD, PIO_OUTPUT_0 | PIO_DEFAULT);
+	#if (USB_DEVICE_PRODUCT_ID == 0xC310) || (USB_DEVICE_PRODUCT_ID == 0xC340)
+    if (FPGA_PINS_ON) {
+        gpio_configure_pin(PIN_USART1_TXD, PIO_OUTPUT_0 | PIO_DEFAULT);
+    }
+    #endif
 }
 #else
 void usart1_enableIO(void)
@@ -338,13 +347,25 @@ ISR(USART3_Handler)
 void usart3_enableIO(void)
 {
 	sysclk_enable_peripheral_clock(ID_USART3);
-	gpio_configure_pin(PIN_USART3_RXD, PIN_USART3_RXD_FLAGS);
-	gpio_configure_pin(PIN_USART3_TXD, PIN_USART3_TXD_FLAGS);
+	#if (USB_DEVICE_PRODUCT_ID == 0xC310) || (USB_DEVICE_PRODUCT_ID == 0xC340)
+    if (FPGA_PINS_ON) {
+        gpio_configure_pin(PIN_USART3_RXD, PIN_USART3_RXD_FLAGS);
+        gpio_configure_pin(PIN_USART3_TXD, PIN_USART3_TXD_FLAGS);
+    }
+    #else
+        gpio_configure_pin(PIN_USART3_RXD, PIN_USART3_RXD_FLAGS);
+        gpio_configure_pin(PIN_USART3_TXD, PIN_USART3_TXD_FLAGS);
+	#endif
 	irq_register_handler(USART3_IRQn, 3);
 }
-void usart3_tx_break(void)
+
+void usart1_tx_break(void)
 {
-	gpio_configure_pin(PIN_USART3_TXD, PIO_OUTPUT_0 | PIO_DEFAULT);
+	#if (USB_DEVICE_PRODUCT_ID == 0xC310) || (USB_DEVICE_PRODUCT_ID == 0xC340)
+    if (FPGA_PINS_ON) {
+        gpio_configure_pin(PIN_USART3_TXD, PIO_OUTPUT_0 | PIO_DEFAULT);
+    }
+    #endif
 }
 #else
 void usart3_enableIO(void)
@@ -941,7 +962,7 @@ bool usart_setup_in_received(void)
 
 bool naeusb_cdc_handle_send_break(uint8_t port, uint16_t wValue)
 {
-    usart_driver *driver = get_nth_available_driver(udd_g_ctrlreq.req.wValue >> 8);
+    usart_driver *driver = get_nth_available_driver(port);
     if (!driver) return false;
 
     switch(wValue) {
