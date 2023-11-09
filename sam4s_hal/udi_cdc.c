@@ -415,6 +415,10 @@ bool udi_cdc_comm_setup(void)
 						(udd_g_ctrlreq.req.wValue
 						 & CDC_CTRL_SIGNAL_ACTIVATE_CARRIER)));
 				return true;
+			#ifdef UDI_CDC_HANDLE_SEND_BREAK
+			case USB_REQ_CDC_SEND_BREAK:
+				return UDI_CDC_HANDLE_SEND_BREAK(udi_cdc_setup_to_port(), udd_g_ctrlreq.req.wValue);
+			#endif
 			}
 		}
 	}
