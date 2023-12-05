@@ -429,7 +429,8 @@ void usart_handle_xon(usart_driver *driver)
     driver->currently_xoff = 0;
 
     // rerun ISR
-    generic_isr(driver);
+    // don't think I need this, as it's called via the ISR
+    // generic_isr(driver);
 }
 
 // Handle TX/RX for usart in an interrupt
