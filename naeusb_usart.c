@@ -68,6 +68,9 @@ How USART works on CW:
 #define USART_WVREQ_NUMWAIT 0x0014
 #define USART_WVREQ_NUMWAIT_TX 0x0018
 
+#define USART_XON 0x11
+#define USART_XOFF 0x13
+
 #define word2buf(buf, word)   do{buf[0] = LSB0W(word); buf[1] = LSB1W(word); buf[2] = LSB2W(word); buf[3] = LSB3W(word);}while (0)
 #define buf2word(word, buf)   do{word = *((uint32_t *)buf);}while (0)
 
@@ -411,6 +414,24 @@ void usart_tx_break(usart_driver *driver)
     }
 }
 
+void usart_handle_xoff(usart_driver *driver)
+{
+    driver->currently_xoff = 1;
+    // should do everything else next time it tries to send a char
+    // if (usart_get_interrupt_mask(driver)) {
+
+    // }
+}
+
+void usart_handle_xon(usart_driver *driver)
+{
+    // disable xoff
+    driver->currently_xoff = 0;
+
+    // rerun ISR
+    generic_isr(driver);
+}
+
 // Handle TX/RX for usart in an interrupt
 void generic_isr(usart_driver *driver)
 {
@@ -429,14 +450,25 @@ void generic_isr(usart_driver *driver)
         // write to CDC buffer, gets sent back whenever the OS desides it's time
         udi_cdc_multi_putc(port, temp);
 
-        // record if and RX overruns happened
+        // record if an RX overrun happened
         if (driver->rxbuf.dropped > 0) {
             CURRENT_ERRORS |= CW_ERR_USART_RX_OVERFLOW;
+        }
+
+        if (temp == USART_XOFF) {
+            usart_handle_xoff(driver);
+        } else if (temp == USART_XON) {
+            usart_handle_xon(driver);
         }
 	}
 	
     // Handle TX
 	if (status & US_CSR_TXRDY){
+        
+        // if XOFF, don't send anything
+        if (driver->currently_xoff) {
+            return;
+        }
 
         // If the TX buffer still has characters, send out the next
 		if (circ_buf_has_char(&driver->txbuf)){
@@ -620,11 +652,15 @@ void usart_driver_putchar(usart_driver *driver, uint8_t data)
     // Add new characters to TX buffer
     add_to_circ_buf(&driver->txbuf, data, false);
 
+
     // Check if a transmission is ongoing
 	if ((usart_get_interrupt_mask(driver->usart) & US_CSR_TXRDY) == 0) {
         // If not, send out the first character and enable interrupt on TX sent
-		if ((usart_get_status(driver->usart) & US_CSR_TXRDY))
-			usart_putchar(driver->usart, get_from_circ_buf(&driver->txbuf));
+		if ((usart_get_status(driver->usart) & US_CSR_TXRDY)){
+            if (!driver->currently_xoff) {
+                usart_putchar(driver->usart, get_from_circ_buf(&driver->txbuf));
+            }
+        }
 		usart_enable_interrupt(driver->usart, US_CSR_TXRDY);
 	}
 }
@@ -811,8 +847,11 @@ void my_callback_rx_notify(uint8_t port)
 
     // See usart_driver_putchar()
     if ((usart_get_interrupt_mask(driver->usart) & US_CSR_TXRDY) == 0) {
-        if ((usart_get_status(driver->usart) & US_CSR_TXRDY))
-            usart_putchar(driver->usart, udi_cdc_multi_getc(port));
+        if ((usart_get_status(driver->usart) & US_CSR_TXRDY)) {
+            if (!driver->currently_xoff) {
+                usart_putchar(driver->usart, udi_cdc_multi_getc(port));
+            }
+        }
         usart_enable_interrupt(driver->usart, US_CSR_TXRDY);
     }
 }
