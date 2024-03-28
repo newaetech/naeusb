@@ -67,6 +67,7 @@ How USART works on CW:
 #define USART_WVREQ_DISABLE 0x0012
 #define USART_WVREQ_NUMWAIT 0x0014
 #define USART_WVREQ_NUMWAIT_TX 0x0018
+#define USART_WVREQ_XONXOFF 0x0020
 
 #define USART_XON 0x11
 #define USART_XOFF 0x13
@@ -223,6 +224,7 @@ usart_driver usart0_driver = {
     .usart_id = 0,
     .cdc_supported = 1,
     .cdc_settings_change = 1,
+    .xonxoff_enabled = 0,
 
 };
 
@@ -272,6 +274,7 @@ usart_driver usart1_driver = {
     .usart_id = 1,
     .cdc_supported = 1,
     .cdc_settings_change = 1,
+    .xonxoff_enabled = 0,
 
 };
 ISR(USART1_Handler)
@@ -341,6 +344,7 @@ usart_driver usart3_driver = {
     .usart_id = 3,
     .cdc_supported = 1,
     .cdc_settings_change = 1,
+    .xonxoff_enabled = 0,
 
 };
 ISR(USART3_Handler)
@@ -456,10 +460,12 @@ void generic_isr(usart_driver *driver)
             CURRENT_ERRORS |= CW_ERR_USART_RX_OVERFLOW;
         }
 
-        if (temp == USART_XOFF) {
-            usart_handle_xoff(driver);
-        } else if (temp == USART_XON) {
-            usart_handle_xon(driver);
+        if (driver->xonxoff_enabled) {
+            if (temp == USART_XOFF) {
+                usart_handle_xoff(driver);
+            } else if (temp == USART_XON) {
+                usart_handle_xon(driver);
+            }
         }
 	}
 	
@@ -467,8 +473,10 @@ void generic_isr(usart_driver *driver)
 	if (status & US_CSR_TXRDY){
         
         // if XOFF, don't send anything
-        if (driver->currently_xoff) {
-            return;
+        if (driver->xonxoff_enabled) {
+            if (driver->currently_xoff) {
+                return;
+            }
         }
 
         // If the TX buffer still has characters, send out the next
@@ -527,6 +535,14 @@ bool ctrl_usart_in(void)
         driver->txbuf.dropped = 0; //clear dropped characters
         word2buf(respbuf, cnt);
         CURRENT_ERRORS &= ~CW_ERR_USART_TX_OVERFLOW;
+        return true;
+    case USART_WVREQ_XONXOFF:
+        if (udd_g_ctrlreq.req.wLength < 1) {
+            return false;
+        }
+        udd_g_ctrlreq.payload = respbuf;
+        udd_g_ctrlreq.payload_size = 1;
+        respbuf[0] = driver->xonxoff_enabled | (driver->currently_xoff << 1);
         return true;
     }
 
@@ -643,6 +659,9 @@ void ctrl_usart_out(void)
         usart_disable_tx(driver->usart);
         usart_disable_interrupt(driver->usart, UART_IER_RXRDY | UART_IER_TXRDY);
         return ;
+    case USART_WVREQ_XONXOFF:
+        driver->xonxoff_enabled = udd_g_ctrlreq.payload[0];
+        return;
     }
 }
 
@@ -658,7 +677,7 @@ void usart_driver_putchar(usart_driver *driver, uint8_t data)
 	if ((usart_get_interrupt_mask(driver->usart) & US_CSR_TXRDY) == 0) {
         // If not, send out the first character and enable interrupt on TX sent
 		if ((usart_get_status(driver->usart) & US_CSR_TXRDY)){
-            if (!driver->currently_xoff) {
+            if (!driver->currently_xoff || !driver->xonxoff_enabled) {
                 usart_putchar(driver->usart, get_from_circ_buf(&driver->txbuf));
             }
         }
@@ -849,7 +868,7 @@ void my_callback_rx_notify(uint8_t port)
     // See usart_driver_putchar()
     if ((usart_get_interrupt_mask(driver->usart) & US_CSR_TXRDY) == 0) {
         if ((usart_get_status(driver->usart) & US_CSR_TXRDY)) {
-            if (!driver->currently_xoff) {
+            if (!driver->currently_xoff || !driver->xonxoff_enabled) {
                 usart_putchar(driver->usart, udi_cdc_multi_getc(port));
             }
         }

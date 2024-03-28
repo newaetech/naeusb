@@ -23,6 +23,7 @@ typedef struct {
 	uint8_t cdc_enabled:1;
 	uint8_t cdc_settings_change:1;
 	uint8_t currently_xoff:1;
+	uint8_t xonxoff_enabled:1;
 } usart_driver;
 
 
