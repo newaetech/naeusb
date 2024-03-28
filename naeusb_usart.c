@@ -542,6 +542,7 @@ bool ctrl_usart_in(void)
         }
         udd_g_ctrlreq.payload = respbuf;
         udd_g_ctrlreq.payload_size = 1;
+        if (!driver->xonxoff_enabled) driver->currently_xoff = 0;
         respbuf[0] = driver->xonxoff_enabled | (driver->currently_xoff << 1);
         return true;
     }
@@ -661,6 +662,7 @@ void ctrl_usart_out(void)
         return ;
     case USART_WVREQ_XONXOFF:
         driver->xonxoff_enabled = udd_g_ctrlreq.payload[0];
+        if (!driver->xonxoff_enabled) driver->currently_xoff = 0;
         return;
     }
 }
