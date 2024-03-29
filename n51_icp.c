@@ -25,7 +25,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-// CW specific
+// NAEUSB specific
 #define DEFAULT_BIT_DELAY 2 
 
 #include <stdint.h>
@@ -37,9 +37,10 @@
 #include "delay.h"
 #endif
 // These are MCU dependent (default for N76E003)
-static uint32_t program_time = 20;
+static uint32_t program_time = 25;
 static uint32_t page_erase_time = 6000;
-
+static uint32_t mass_erase_time = 65000;
+static uint32_t post_mass_erase_time = 1000;
 #define ENTRY_BIT_DELAY 60
 
 // ICP Commands
@@ -63,10 +64,6 @@ static uint32_t page_erase_time = 6000;
 // ICP Exit sequence
 #define EXIT_BITS     0xF78F0
 
-#ifndef SUPPORT_OTHER_CHIPS
-#define SUPPORT_OTHER_CHIPS 1
-#endif
-
 // to avoid overhead from calling usleep() for 0 us
 #define USLEEP(x) if (x > 0) N51PGM_usleep(x)
 
@@ -81,7 +78,7 @@ static void N51ICP_bitsend(uint32_t data, int len, uint32_t udelay)
 {
 	N51PGM_dat_dir(1);
 	int i = len;
-	while (i--){
+	while (i--) {
 			N51PGM_set_dat((data >> i) & 1);
 			USLEEP(udelay);
 			N51PGM_set_clk(1);
@@ -123,13 +120,6 @@ int N51ICP_init(uint8_t do_reset)
 		}
 	}
 	N51ICP_enter_icp_mode(do_reset);
-#if !SUPPORT_OTHER_CHIPS
-	uint32_t dev_id = N51ICP_read_device_id();
-	if (dev_id >> 8 == 0x2F){
-		DEBUG_PRINT("Device ID mismatch: %x\n", dev_id);
-		return -1;
-	}
-#endif
 	return 0;
 }
 
@@ -143,6 +133,7 @@ void N51ICP_enter_icp_mode(uint8_t do_reset) {
 		N51PGM_set_rst(0);
 		USLEEP(1000);
 	}
+	
 	USLEEP(100);
 	N51ICP_send_entry_bits();
 	USLEEP(10);
@@ -332,7 +323,7 @@ uint32_t N51ICP_write_flash(uint32_t addr, uint32_t len, uint8_t *data)
 void N51ICP_mass_erase(void)
 {
 	N51ICP_send_command(ICP_CMD_MASS_ERASE, 0x3A5A5);
-	N51ICP_write_byte(0xff, 1, 65000, 500);
+	N51ICP_write_byte(0xff, 1, mass_erase_time, post_mass_erase_time);
 }
 
 void N51ICP_page_erase(uint32_t addr)
@@ -341,14 +332,24 @@ void N51ICP_page_erase(uint32_t addr)
 	N51ICP_write_byte(0xff, 1, page_erase_time, 100);
 }
 
-void N51ICP_set_program_time(uint32_t time)
+void N51ICP_set_program_time(uint32_t time_us)
 {
-	program_time = time;
+	program_time = time_us;
 }
 
-void N51ICP_set_page_erase_time(uint32_t time)
+void N51ICP_set_page_erase_time(uint32_t time_us)
 {
-	page_erase_time = time;
+	page_erase_time = time_us;
+}
+
+void N51ICP_set_mass_erase_time(uint32_t time_us)
+{
+	mass_erase_time = time_us;
+}
+
+void N51ICP_set_post_mass_erase_time(uint32_t time_us)
+{
+	post_mass_erase_time = time_us;
 }
 
 void N51ICP_outputf(const char *s, ...)

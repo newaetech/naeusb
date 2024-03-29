@@ -31,14 +31,16 @@
 #define NUVO_CMD_REENTER_ICP 0xe9
 // For getting the configuration bytes to read at consistent times during an ICP reentry.
 #define NUVO_CMD_REENTRY_GLITCH 0xea
-// Release the pins only
-#define NUVO_CMD_DEINIT_PGM_ONLY 0xeb
 // Write to flash
 #define NUVO_CMD_WRITE_FLASH 0xed
 // Set the programming time between bytes
 #define NUVO_SET_PROG_TIME 0xec
 // Set the erase time for a page
 #define NUVO_SET_PAGE_ERASE_TIME 0xee
+// Set the mass erase time.
+#define NUVO_SET_MASS_ERASE_TIME 0xef
+// Set the post mass erase time.
+#define NUVO_SET_POST_MASS_ERASE_TIME 0xe3
 
 // ChipWhisperer specific
 #define NUVO_GET_RAMBUF 0xe4

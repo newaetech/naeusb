@@ -156,6 +156,19 @@ bool NuvoICP_Protocol_Command(void)
     N51ICP_set_page_erase_time(unpack_u32(udd_g_ctrlreq.payload, PDATA_START));
     break;
 
+  case NUVO_SET_MASS_ERASE_TIME:
+    if (!_check_param_len(4)){
+      return false;
+    }
+    N51ICP_set_mass_erase_time(unpack_u32(udd_g_ctrlreq.payload, PDATA_START));
+    break;
+
+  case NUVO_SET_POST_MASS_ERASE_TIME:
+    if (!_check_param_len(4)){
+      return false;
+    }
+    N51ICP_set_post_mass_erase_time(unpack_u32(udd_g_ctrlreq.payload, PDATA_START));
+    break;
   default:
     break;
   }
