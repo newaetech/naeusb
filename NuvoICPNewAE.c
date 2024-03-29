@@ -71,6 +71,10 @@ bool NuvoICP_Protocol_Command(void)
     nuvoicp_status_payload_size = NuvoICP_GetParam(NUVO_CMD_GET_DEVICEID, &status_payload[STATUS_DATA_START]);
     break;
 
+  case NUVO_CMD_GET_PID:
+    nuvoicp_status_payload_size = NuvoICP_GetParam(NUVO_CMD_GET_PID, &status_payload[STATUS_DATA_START]);
+    break;
+
   case NUVO_CMD_GET_UID:
     nuvoicp_status_payload_size = NuvoICP_GetParam(NUVO_CMD_GET_UID,  &status_payload[STATUS_DATA_START]);
     break;
@@ -312,6 +316,10 @@ uint16_t NuvoICP_GetParam(uint8_t cmd, uint8_t *buf)
     case NUVO_CMD_GET_UCID:
       N51ICP_read_ucid(buf);
       val_length = 16;
+      break;
+    case NUVO_CMD_GET_PID:
+      value = N51ICP_read_pid();
+      in_val = true;
       break;
   }
   if (in_val)

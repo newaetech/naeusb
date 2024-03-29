@@ -41,6 +41,8 @@
 #define NUVO_SET_MASS_ERASE_TIME 0xef
 // Set the post mass erase time.
 #define NUVO_SET_POST_MASS_ERASE_TIME 0xe3
+// Get the PID of the chip
+#define NUVO_CMD_GET_PID 0xeb
 
 // ChipWhisperer specific
 #define NUVO_GET_RAMBUF 0xe4
