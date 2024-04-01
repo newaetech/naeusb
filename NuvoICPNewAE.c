@@ -129,7 +129,12 @@ bool NuvoICP_Protocol_Command(void)
     if (!_check_param_len(1)) {
       return false;
     }
-    N51ICP_enter_icp_mode(udd_g_ctrlreq.payload[PDATA_START]);
+    uint32_t ret = N51ICP_enter_icp_mode(udd_g_ctrlreq.payload[PDATA_START]);
+    nuvoicp_status_payload_size = 4;
+    status_payload[STATUS_DATA_START] = ret & 0xff;
+    status_payload[STATUS_DATA_START + 1] = (ret >> 8) & 0xff;
+    status_payload[STATUS_DATA_START + 2] = (ret >> 16) & 0xff;
+    status_payload[STATUS_DATA_START + 3] = (ret >> 24) & 0xff;
   } break;
 
   case NUVO_CMD_EXIT_ICP_MODE:
@@ -147,32 +152,26 @@ bool NuvoICP_Protocol_Command(void)
     break;
 
   case NUVO_SET_PROG_TIME:
-    if (!_check_param_len(4)){
+    if (!_check_param_len(8)){
       return false;
     }
-    N51ICP_set_program_time(unpack_u32(udd_g_ctrlreq.payload, PDATA_START));
+    N51ICP_set_program_time(unpack_u32(udd_g_ctrlreq.payload, PDATA_START), unpack_u32(udd_g_ctrlreq.payload, PDATA_START+4));
     break;
   
   case NUVO_SET_PAGE_ERASE_TIME:
-    if (!_check_param_len(4)){
+    if (!_check_param_len(8)){
       return false;
     }
-    N51ICP_set_page_erase_time(unpack_u32(udd_g_ctrlreq.payload, PDATA_START));
+    N51ICP_set_page_erase_time(unpack_u32(udd_g_ctrlreq.payload, PDATA_START), unpack_u32(udd_g_ctrlreq.payload, PDATA_START+4));
     break;
 
   case NUVO_SET_MASS_ERASE_TIME:
-    if (!_check_param_len(4)){
+    if (!_check_param_len(8)){
       return false;
     }
-    N51ICP_set_mass_erase_time(unpack_u32(udd_g_ctrlreq.payload, PDATA_START));
+    N51ICP_set_mass_erase_time(unpack_u32(udd_g_ctrlreq.payload, PDATA_START), unpack_u32(udd_g_ctrlreq.payload, PDATA_START+4));
     break;
 
-  case NUVO_SET_POST_MASS_ERASE_TIME:
-    if (!_check_param_len(4)){
-      return false;
-    }
-    N51ICP_set_post_mass_erase_time(unpack_u32(udd_g_ctrlreq.payload, PDATA_START));
-    break;
   default:
     break;
   }
@@ -206,7 +205,7 @@ void NuvoICP_Reentry_glitch(void)
 
 void NuvoICP_EnterProgMode(void)
 {
-  uint8_t res = N51ICP_init(true);
+  uint8_t res = N51ICP_init();
   if (res < 0) // negative error codes
   {
     N51_Status = res * -1;
