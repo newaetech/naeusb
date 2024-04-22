@@ -20,33 +20,39 @@ CFLAGS += -fno-strict-aliasing -Wall -Wstrict-prototypes -Wmissing-prototypes -W
 CFLAGS += -Wcomment -Wformat=2 --param max-inline-insns-single=500
 CFLAGS += -DDEBUG -DARM_MATH_CM3=true -Dprintf=iprintf -DUDD_ENABLE -Dscanf=iscanf -DPLATFORMCW1190=1
 CFLAGS += -Wno-discarded-qualifiers -Wno-unused-function -Wno-unused-variable -Wno-strict-prototypes -Wno-missing-prototypes
-CFLAGS += -Wno-pointer-sign -Wno-unused-value 
+CFLAGS += -Wno-pointer-sign -Wno-unused-value -Wno-unused-but-set-variable
 PROGCMD="import sys, time; assert len(sys.argv) > 1; import chipwhisperer as cw; exec('try: scope = cw.scope(); p = cw.SAMFWLoader(scope); p.enter_bootloader(True); time.sleep(2);\nexcept: pass'); cw.program_sam_firmware(fw_path=sys.argv[1])" $(TARGET).bin
 
 ifeq ($(TARGET),ChipWhisperer-Lite)
 	CFLAGS += -D__SAM3U2C__
+	CFLAGS += -D__PLAT_CWLITE__
 	CDC=YES
 	HAL = SAM3U
 else ifeq ($(TARGET),ChipWhisperer-Husky)
 	CFLAGS += -D__SAM3U2C__
+	CFLAGS += -D__PLAT_HUSKY__
 	CDC=YES
 	HAL = SAM3U
 else ifeq ($(TARGET),ChipWhisperer-CW305)
 	CFLAGS += -D__SAM3U2E__
+	CFLAGS += -D__PLAT_CW305__
 	CDC=NO
 	HAL = SAM3U
 	PROGCMD="import sys, time; assert len(sys.argv) > 1; import chipwhisperer as cw; exec('try: scope = cw.target(None, cw.targets.CW305); p = cw.SAMFWLoader(scope); p.enter_bootloader(True); time.sleep(2);\nexcept: pass'); cw.program_sam_firmware(fw_path=sys.argv[1])" $(TARGET).bin
 else ifeq ($(TARGET),ChipWhisperer-Pro)
 	CFLAGS += -D__SAM3U4E__
+	CFLAGS += -D__PLAT_PRO__
 	CDC=YES
 	HAL = SAM3U
 else ifeq ($(TARGET),ChipWhisperer-Nano)
 	CFLAGS += -D__SAM4SD16B__ -DUDD_NO_SLEEP_MGR
+	CFLAGS += -D__PLAT_NANO__
 	HAL = SAM4S
 	CDC=YES
 	LDFLAGS += --specs=nano.specs --specs=nosys.specs
 else ifeq ($(TARGET),cw521)
 	CFLAGS += -D__SAM3U4E__
+	CFLAGS += -D__PLAT_CW521__
 	SRC += naeusb/sam3u_hal/chipid.c naeusb/sam3u_hal/cycle_counter.c naeusb/sam3u_hal/efc.c naeusb/sam3u_hal/exceptions.c
 	SRC += naeusb/sam3u_hal/flash_efc.c naeusb/sam3u_hal/interrupt_sam_nvic.c naeusb/sam3u_hal/led.c
 	SRC += naeusb/sam3u_hal/pio_handler.c naeusb/sam3u_hal/pio.c naeusb/sam3u_hal/pmc.c
@@ -61,9 +67,19 @@ else ifeq ($(TARGET),cw521)
 else ifeq ($(TARGET),CW310)
 	HAL = SAM3X
 	CFLAGS += -D__SAM3X8E__
+	CFLAGS += -D__PLAT_CW310__
 	CDC=YES
+	PROGCMD="import sys, time; assert len(sys.argv) > 1; import chipwhisperer as cw; exec('try: scope = cw.target(None, cw.targets.CW310); p = cw.SAMFWLoader(scope); p.enter_bootloader(True); time.sleep(2);\nexcept: pass'); cw.program_sam_firmware(fw_path=sys.argv[1])" $(TARGET).bin
+else ifeq ($(TARGET),CW340)
+# same for now, might be different at some point?
+	HAL = SAM3X
+	CFLAGS += -D__PLAT_CW340__
+	CFLAGS += -D__SAM3X8E__
+	CDC=YES
+	PROGCMD="import sys, time; assert len(sys.argv) > 1; import chipwhisperer as cw; exec('try: scope = cw.target(None, cw.targets.CW340); p = cw.SAMFWLoader(scope); p.enter_bootloader(True); time.sleep(2);\nexcept: pass'); cw.program_sam_firmware(fw_path=sys.argv[1])" $(TARGET).bin
 else ifeq ($(TARGET),phywhisperer)
 	CFLAGS += -D__SAM3U2E__
+	CFLAGS += -D__PLAT_PHY__
 	CDC=NO
 	HAL = SAM3U
 	PROGCMD="import sys, time; assert len(sys.argv) > 1; \
@@ -86,6 +102,12 @@ else ifeq ($(HAL),SAM4S)
 	EXTRAINCDIRS += naeusb/sam4s_hal/inc
 else ifeq ($(HAL),SAM3X)
 	SRC += $(wildcard naeusb/sam3x_hal/*.c)
+	ifeq ($(CDC),YES)
+		SRC += naeusb/sam3x_hal/usb_cdc/udi_cdc.c
+		SRC += naeusb/sam3x_hal/usb_cdc/udi_composite_desc.c
+	else
+		SRC += naeusb/sam3x_hal/usb_no_cdc/udi_vendor_desc.c
+	endif
 	EXTRAINCDIRS += naeusb/sam3x_hal/inc
 endif
 ##### 
@@ -122,6 +144,15 @@ CFLAGS += -O$(OPT)
 CFLAGS += -funsigned-char -funsigned-bitfields -fshort-enums
 CFLAGS += $(patsubst %,-I%,$(EXTRAINCDIRS))
 CFLAGS += $(CSTANDARD)
+
+GCCCOLOURS?=YES
+ifeq ($(GCCCOLOURS),YES)
+	CFLAGS += -fdiagnostics-color=always
+else ifeq ($(GCCCOLOURS),NO)
+	CFLAGS += -fdiagnostics-color=never
+else
+	CFLAGS += -fdiagnostics-color=auto
+endif
 
 LDFLAGS += -Wl,-Map=$(TARGET).map,--cref
 LDFLAGS += $(EXTMEMOPTS)
@@ -196,7 +227,7 @@ ALL_ASFLAGS = $(MCU_FLAGS) -I. -x assembler-with-cpp $(ASFLAGS)
 all: 
 	@$(MAKE) --no-print-directory -O clean_objs .dep 
 	@$(MAKE) --no-print-directory -O begin build
-	@$(MAKE) --no-print-directory -O end sizeafter
+	@$(MAKE) --no-print-directory -O version end sizeafter
 
 # Change the build target to build a HEX file or a library.
 build: elf hex bin eep lss sym
@@ -351,6 +382,12 @@ $(OBJDIR)/%.o : %.S
 %.i : %.c
 	$(CC) -E $(MCU_FLAGS) -I. $(CFLAGS) $< -o $@
 
+version :
+	@$(CC) -dD -E $(ALL_CFLAGS) ./config/conf_usb.h -o symbols.txt
+	@grep -o -m 1 "FW_VER_MAJOR.*" ./symbols.txt > version.txt
+	@grep -o -m 1 "FW_VER_MINOR.*" ./symbols.txt >> version.txt
+	@grep -o -m 1 "FW_VER_DEBUG.*" ./symbols.txt >> version.txt
+
 # Clean all object files specific to this platform
 clean_objs :
 	@echo cleaning objects
@@ -414,4 +451,4 @@ program :
 .PHONY : all allquick begin finish end sizeafter gccversion \
 build elf hex bin eep lss sym coff extcoff \
 clean clean_list clean_print clean_objs program debug gdb-config \
-fastnote
+fastnote version

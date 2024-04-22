@@ -20,6 +20,7 @@
 
 /* Access pointer for FPGA Interface */
 uint8_t volatile *xram = (uint8_t *) PSRAM_BASE_ADDRESS;
+uint16_t volatile *xram16 = (uint16_t *) PSRAM_BASE_ADDRESS;
 
 static volatile fpga_lockstatus_t _fpga_locked = fpga_unlocked;
 
@@ -75,14 +76,37 @@ void exit_cs(void)
 void FPGA_setaddr(uint32_t addr)
 {
 	#if (USB_DEVICE_PRODUCT_ID == 0xACE5) || (USB_DEVICE_PRODUCT_ID == 0xC610)
-	//husky
+    //husky
 	  FPGA_ADDR_PORT->PIO_ODSR = (FPGA_ADDR_PORT->PIO_ODSR & 0x40) | (addr & 0x3F) | ((addr & 0xC0) << 1);
-	#else
-			pio_sync_output_write(FPGA_ADDR_PORT, addr);
-	#endif
-
+    gpio_set_pin_low(FPGA_ALE_GPIO);
+    gpio_set_pin_high(FPGA_ALE_GPIO);
+  #elif (USB_DEVICE_PRODUCT_ID == 0xC340)
+      const uint32_t addr_pins[] = {
+        PIN_EBI_DATA_BUS_D8,
+        PIN_EBI_DATA_BUS_D9,
+        PIN_EBI_DATA_BUS_D10,
+        PIN_EBI_DATA_BUS_D11,
+        PIN_EBI_DATA_BUS_D12,
+        PIN_EBI_DATA_BUS_D13,
+        PIN_EBI_DATA_BUS_D14,
+        PIN_EBI_DATA_BUS_D15
+      };
+      for (uint8_t i = 0; i < 8; i++) {
+        gpio_configure_pin(addr_pins[i], (addr & (1 << i)) ? PIO_OUTPUT_1 : PIO_OUTPUT_0);
+      }
 			gpio_set_pin_low(FPGA_ALE_GPIO);
 			gpio_set_pin_high(FPGA_ALE_GPIO);
+
+      for (uint8_t i = 0; i < 8; i++) {
+        gpio_configure_pin(addr_pins[i], PIN_EBI_DATA_BUS_FLAG1);
+      }
+	#else
+			pio_sync_output_write(FPGA_ADDR_PORT, addr);
+			gpio_set_pin_low(FPGA_ALE_GPIO);
+			gpio_set_pin_high(FPGA_ALE_GPIO);
+	#endif
+
+
 }
 #else
 void FPGA_setaddr(uint32_t addr)

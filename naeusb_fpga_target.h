@@ -29,12 +29,6 @@
 #define FREQ_FPGASPI1_XFER 0x35
 
 #define REQ_XMEGA_PROGRAM 0x20
-typedef enum {
-    bep_emem=0,
-    bep_fpgabitstream=10
-} blockep_usage_t;
-
-extern blockep_usage_t blockendpoint_usage;
 
 void fpga_target_register_handlers(void);
 

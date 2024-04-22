@@ -123,8 +123,12 @@ void fpga_program_init(void);
 void fpga_program_setup1(uint32_t);
 
 /**
- * \brief Set NPROG to idle state in preperation for programming to commence
+ * \brief Set NPROG to idle state in preperation for programming to commence and bulk read
+ *
  */
 void fpga_program_setup2(void);
+
+// any required setup
+void fpga_program_finish(void);
 
 #endif

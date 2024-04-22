@@ -169,7 +169,10 @@ IntFunc exception_table[] = {
 };
 
 /* TEMPORARY PATCH FOR SCB */
+#ifndef SCB_VTOR_TBLBASE_Pos
 #define SCB_VTOR_TBLBASE_Pos               29                            /*!< SCB VTOR: TBLBASE Position */
+#endif
+
 #define SCB_VTOR_TBLBASE_Msk               (1UL << SCB_VTOR_TBLBASE_Pos) /*!< SCB VTOR: TBLBASE Mask */
 
 /**

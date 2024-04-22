@@ -17,10 +17,13 @@ typedef struct {
 	tcirc_buf txbuf;
 	tcirc_buf rx_cdc_buf;
 	int usart_id;
+	int cdc_port;
 	uint8_t cdc_supported:1;
 	uint8_t enabled:1;
 	uint8_t cdc_enabled:1;
 	uint8_t cdc_settings_change:1;
+	uint8_t currently_xoff:1;
+	uint8_t xonxoff_enabled:1;
 } usart_driver;
 
 
@@ -28,4 +31,4 @@ void naeusart_register_handlers(void);
 usart_driver *get_usart_from_id(int id);
 usart_driver *get_nth_available_driver(int id);
 
-void cdc_send_to_pc(void);
+// void cdc_send_to_pc(void);

@@ -58,7 +58,7 @@ struct  {
 
     .tx_req = 0x00, .swd_mode = 0x00, .swd_out_en = 0x00, .enabled = 0x00,
     #ifdef MPSSE_TMS_WR
-    .swd_out_en_pin = MPSSE_TMS_WR_0,
+    .swd_out_en_pin = MPSSE_TMS_WR,
     #elif MPSSE_TMS_WR_PIN_0
     .swd_out_en_pin = MPSSE_TMS_WR_PIN_0,
     #endif

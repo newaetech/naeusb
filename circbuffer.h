@@ -54,5 +54,9 @@ void add_to_circ_buf(tcirc_buf *cbuf, uint8_t ch, bool block);
 bool circ_buf_has_char(tcirc_buf *cbuf);
 uint8_t get_from_circ_buf(tcirc_buf *cbuf);
 unsigned int circ_buf_count(tcirc_buf *cbuf);
+static inline unsigned int circ_buf_count_left(tcirc_buf *cbuf)
+{
+    return CIRCBUFSIZE - circ_buf_count(cbuf);
+}
 
 #endif //CIRCBUFFER_H

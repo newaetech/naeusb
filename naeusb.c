@@ -9,11 +9,10 @@ static uint8_t naeusb_num_out_handlers = 0;
 static volatile bool main_b_vendor_enable = true;
 static bool active = false;
 
-COMPILER_WORD_ALIGNED uint8_t ctrlbuffer[64];
-COMPILER_WORD_ALIGNED uint8_t respbuf[64];
+COMPILER_WORD_ALIGNED uint8_t ctrlbuffer[128];
+COMPILER_WORD_ALIGNED uint8_t respbuf[128];
 
-COMPILER_WORD_ALIGNED
-uint8_t main_buf_loopback[MAIN_LOOPBACK_SIZE];
+COMPILER_WORD_ALIGNED uint8_t main_buf_loopback[MAIN_LOOPBACK_SIZE];
 
 bool usb_is_enabled(void)
 {
@@ -68,13 +67,13 @@ bool main_vendor_enable(void)
     active = true;
     main_b_vendor_enable = true;
     // Start data reception on OUT endpoints
-// #if UDI_VENDOR_EPS_SIZE_BULK_FS
-//     //main_vendor_bulk_in_received(UDD_EP_TRANSFER_OK, 0, 0);
+#if UDI_VENDOR_EPS_SIZE_BULK_FS
+    //main_vendor_bulk_in_received(UDD_EP_TRANSFER_OK, 0, 0);
     udi_vendor_bulk_out_run(
         main_buf_loopback,
         sizeof(main_buf_loopback),
         main_vendor_bulk_out_received);
-// #endif
+#endif
     return true;
 }
 

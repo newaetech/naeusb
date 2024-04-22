@@ -141,11 +141,12 @@ struct MS_OS_DESC_SET_HEADER {
     uint8_t wDescriptorType[2];
     uint8_t dwWindowsVersion[4];
     uint8_t wTotalLength[2];
-#if USB_DEVICE_NB_INTERFACE > 1
-    struct MS_FUNC_SUBSET_HEADER FUNC[2];
-#else
-    struct MS_FUNC_SUBSET_HEADER FUNC[1];
-#endif
+    struct MS_FUNC_SUBSET_HEADER FUNC[USB_DEVICE_NB_INTERFACE];
+// #if USB_DEVICE_NB_INTERFACE > 1
+//     struct MS_FUNC_SUBSET_HEADER FUNC[2];
+// #else
+//     struct MS_FUNC_SUBSET_HEADER FUNC[1];
+// #endif
 };
 
 #if USB_DEVICE_NB_INTERFACE > 1
@@ -154,8 +155,7 @@ struct MS_OS_DESC_SET_HEADER {
 .wLength=U162ARR(0x0A), \
 .wDescriptorType=U162ARR(0x00), \
 .dwWindowsVersion={0x00, 0x00, 0x03, 0x06}, \
-.wTotalLength=U162ARR(sizeof(struct MS_OS_DESC_SET_HEADER)), \
-.FUNC = {MAKE_FUNC_SUBSET_HEADER(0), MAKE_FUNC_SUBSET_HEADER(1)} \
+.wTotalLength=U162ARR(sizeof(struct MS_OS_DESC_SET_HEADER)) \
 }
 #else
 #define MAKE_OS_DESC_SET_HEADER \

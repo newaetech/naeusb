@@ -19,6 +19,30 @@
 #include <asf.h>
 #include "fpga_program.h"
 #include "spi.h"
+#include "pdc.h"
+#include "usb_xmem.h"
+#include "usb.h"
+
+extern blockep_usage_t blockendpoint_usage;
+#define PROG_BUF_SIZE 1024
+
+COMPILER_WORD_ALIGNED volatile uint8_t fpga_prog_buf[PROG_BUF_SIZE];
+void fpga_prog_bulk_out_received(udd_ep_status_t status,
+                                   iram_size_t nb_transfered, udd_ep_id_t ep)
+{
+    if (UDD_EP_TRANSFER_OK != status) {
+        // Transfer aborted
+        return;
+    }
+
+    for(unsigned int i = 0; i < nb_transfered; i++){
+        fpga_program_sendbyte(fpga_prog_buf[i]);
+    }
+	udi_vendor_bulk_out_run(
+			fpga_prog_buf,
+			PROG_BUF_SIZE,
+			fpga_prog_bulk_out_received);
+}
 
 void fpga_program_spi_setup1(uint32_t prog_freq)
 {
@@ -77,24 +101,6 @@ void fpga_program_setup1(uint32_t prog_freq)
 	/* Init - set program low to erase FPGA */
 	FPGA_NPROG_LOW();
 
-#if (USB_DEVICE_PRODUCT_ID == 0xACE5) || (USB_DEVICE_PRODUCT_ID == 0xC610) || (USB_DEVICE_PRODUCT_ID == 0xC310)
-    
-    usart_spi_opt_t spiopts;
-    spiopts.baudrate = prog_freq;
-    spiopts.char_length = US_MR_CHRL_8_BIT;
-    spiopts.channel_mode = US_MR_CHMODE_NORMAL;
-    spiopts.spi_mode = SPI_MODE_0;
-
-    sysclk_enable_peripheral_clock(FPGA_PROG_USART_ID);
-    usart_init_spi_master(FPGA_PROG_USART, &spiopts, sysclk_get_cpu_hz());
-    FPGA_DO_SETUP();
-    FPGA_CCLK_SETUP();
-
-    //pin setup doesn't transfer control over to USART, so have to do it manually
-    PIOA->PIO_PDR = (1 << PIN_FPGA_DO_GPIO) | (1 << PIN_FPGA_CCLK_GPIO);
-    usart_enable_tx(FPGA_PROG_USART);
-	
-#else
 	#if FPGA_USE_BITBANG
 	FPGA_CCLK_SETUP();
 	FPGA_DO_SETUP();
@@ -108,8 +114,8 @@ void fpga_program_setup1(uint32_t prog_freq)
 	sysclk_enable_peripheral_clock(FPGA_PROG_USART_ID);
 	usart_init_spi_master(FPGA_PROG_USART, &spiopts, sysclk_get_cpu_hz());
 
-	gpio_configure_pin(PIN_FPGA_CCLK_GPIO, PIN_FPGA_CCLK_USART_FLAGS);
-	gpio_configure_pin(PIN_FPGA_DO_GPIO, PIN_FPGA_DO_USART_FLAGS);
+    FPGA_DO_SETUP();
+    FPGA_CCLK_SETUP();
 	
 	usart_enable_tx(FPGA_PROG_USART);
 	#else
@@ -129,13 +135,23 @@ void fpga_program_setup1(uint32_t prog_freq)
 	gpio_configure_pin(SPI_MOSI_GPIO, SPI_MOSI_FLAGS);
 	gpio_configure_pin(SPI_SPCK_GPIO, SPI_SPCK_FLAGS);
 	#endif
-#endif
 }
 
 /* FPGA Programming Step 2: Prepare FPGA for receiving programming data */
 void fpga_program_setup2(void)
 {
     FPGA_NPROG_HIGH();
+	udd_ep_abort(UDI_VENDOR_EP_BULK_OUT);
+
+	// udi_vendor_bulk_out_run(
+	// 		main_buf_loopback,
+	// 		sizeof(main_buf_loopback),
+	// 		main_vendor_bulk_out_received);
+	udi_vendor_bulk_out_run(
+			fpga_prog_buf,
+			PROG_BUF_SIZE,
+			fpga_prog_bulk_out_received);
+	// blockendpoint_usage = bep_fpgabitstream;
 }
 
 //For debug only
@@ -144,32 +160,39 @@ void fpga_program_setup2(void)
 /* FPGA Programming Step 3: Send data until done */
 void fpga_program_sendbyte(uint8_t databyte)
 {
-    #if (USB_DEVICE_PRODUCT_ID == 0xACE5) || (USB_DEVICE_PRODUCT_ID == 0xC610)
 	//For debug only
     //fpga_total_bs_len++;
-    usart_putchar(FPGA_PROG_USART, databyte);
-	
-	#else
-		//For debug only
-		//fpga_total_bs_len++;
 		
-		#if FPGA_USE_BITBANG
-		for(unsigned int i=0; i < 8; i++){
-			FPGA_CCLK_LOW();
-			
-			if (databyte & 0x01){
-				FPGA_DO_HIGH();
-				} else {
-				FPGA_DO_LOW();
-			}
-			
-			FPGA_CCLK_HIGH();
-			databyte = databyte >> 1;
+	#if FPGA_USE_BITBANG
+	for(unsigned int i=0; i < 8; i++){
+		FPGA_CCLK_LOW();
+		
+		if (databyte & 0x01){
+			FPGA_DO_HIGH();
+			} else {
+			FPGA_DO_LOW();
 		}
-		#elif FPGA_USE_USART
-		usart_putchar(FPGA_PROG_USART, databyte);
-		#else
-		spi_write(SPI, databyte, 0, 0);
-		#endif
+		
+		FPGA_CCLK_HIGH();
+		databyte = databyte >> 1;
+	}
+	#elif FPGA_USE_USART
+	usart_putchar(FPGA_PROG_USART, databyte);
+	#else
+	spi_write(SPI, databyte, 0, 0);
 	#endif
+}
+
+void main_vendor_bulk_out_received(udd_ep_status_t status,
+                                   iram_size_t nb_transfered, udd_ep_id_t ep);
+
+extern uint8_t main_buf_loopback[MAIN_LOOPBACK_SIZE];
+void fpga_program_finish(void)
+{
+	// blockendpoint_usage = bep_emem;
+	udd_ep_abort(UDI_VENDOR_EP_BULK_OUT);
+	udi_vendor_bulk_out_run(
+			main_buf_loopback,
+			sizeof(main_buf_loopback),
+			main_vendor_bulk_out_received);
 }

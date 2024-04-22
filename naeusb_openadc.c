@@ -14,9 +14,14 @@ blockep_usage_t blockendpoint_usage = bep_emem;
 static uint8_t * ctrlmemread_buf;
 static unsigned int ctrlmemread_size;
 
+void main_vendor_bulk_in_received(udd_ep_status_t status,
+                                  iram_size_t nb_transfered, udd_ep_id_t ep);
+void main_vendor_bulk_out_received(udd_ep_status_t status,
+                                  iram_size_t nb_transfered, udd_ep_id_t ep);
+
 void openadc_progfpga_bulk(void){
-	uint32_t prog_freq = 1E6;
-    switch(udd_g_ctrlreq.req.wValue){
+	uint32_t prog_freq = 10E6;
+    switch(udd_g_ctrlreq.req.wValue & 0xFF){
     case 0xA0:
         
         if (udd_g_ctrlreq.req.wLength == 4) {
@@ -28,12 +33,13 @@ void openadc_progfpga_bulk(void){
     case 0xA1:
         /* Waiting on data... */
         fpga_program_setup2();
-        blockendpoint_usage = bep_fpgabitstream;
+        // blockendpoint_usage = bep_fpgabitstream;
         break;
 
     case 0xA2:
         /* Done */
-        blockendpoint_usage = bep_emem;
+        // blockendpoint_usage = bep_emem;
+        fpga_program_finish();
         break;
 
     case 0xB0:
@@ -94,8 +100,13 @@ void openadc_writemem_bulk(void)
 
     /* Set address */
     FPGA_setaddr(address);
+	udd_ep_abort(UDI_VENDOR_EP_BULK_OUT);
 
     /* Transaction done in generic callback */
+    udi_vendor_bulk_out_run(
+        main_buf_loopback,
+        sizeof(main_buf_loopback),
+        main_vendor_bulk_out_received);
 
 }
 
@@ -115,6 +126,10 @@ void openadc_readmem_ctrl(void)
 
     /* Set size to read */
     ctrlmemread_size = buflen;
+    // udi_vendor_bulk_out_run(
+    //     xram,
+    //     0xFFFFFFFF,
+    //     NULL);
 
     /* Start Transaction */
     
@@ -170,10 +185,10 @@ void main_vendor_bulk_out_received(udd_ep_status_t status,
         // Transfer aborted
 
         //restart
-        udi_vendor_bulk_out_run(
-            main_buf_loopback,
-            sizeof(main_buf_loopback),
-            main_vendor_bulk_out_received);
+        // udi_vendor_bulk_out_run(
+        //     main_buf_loopback,
+        //     sizeof(main_buf_loopback),
+        //     main_vendor_bulk_out_received);
 
         return;
     }

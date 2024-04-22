@@ -55,7 +55,7 @@ extern "C" {
 /// @endcond
 
 /** Time-out value (number of attempts). */
-#define TWI_TIMEOUT              15000
+#define TWI_TIMEOUT              15000000
 
 /**
  * \brief Return codes for TWI APIs.

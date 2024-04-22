@@ -30,9 +30,22 @@
  * DAMAGE.
  */
 
+
+/*
+
+How USART works on CW:
+
+1. Setup UART/IO/Clock
+2. For RX, always have an interrupt running that writes into a circular buffer
+3. For TX, send the first character, then write the rest into a circular buffer. As characters go out, interrupt and send out the next
+4. CDC stuff already has its own buffer. CDC basically works the same as above, except you write into the CDC buffer instead of our circ buffer
+
+*/
+
 #include <asf.h>
 #include "circbuffer.h"
 #include "usart_driver.h"
+#include "naeusb_default.h"
 #include "usart.h"
 #include "usb_protocol_cdc.h"
 #include "naeusb_usart.h"
@@ -54,6 +67,10 @@
 #define USART_WVREQ_DISABLE 0x0012
 #define USART_WVREQ_NUMWAIT 0x0014
 #define USART_WVREQ_NUMWAIT_TX 0x0018
+#define USART_WVREQ_XONXOFF 0x0020
+
+#define USART_XON 0x11
+#define USART_XOFF 0x13
 
 #define word2buf(buf, word)   do{buf[0] = LSB0W(word); buf[1] = LSB1W(word); buf[2] = LSB2W(word); buf[3] = LSB3W(word);}while (0)
 #define buf2word(word, buf)   do{word = *((uint32_t *)buf);}while (0)
@@ -62,10 +79,11 @@ bool usart_setup_in_received(void);
 bool usart_setup_out_received(void);
 bool naeusb_cdc_settings_in(void);
 void naeusb_cdc_settings_out(void);
+int driver_to_port(usart_driver *driver);
 
 void generic_isr(usart_driver *driver);
 
-bool NAEUSB_CDC_IS_RUNNING = false;
+// bool NAEUSB_CDC_IS_RUNNING = false;
 
 #ifdef CW_TARGET_SPI
 
@@ -206,25 +224,47 @@ usart_driver usart0_driver = {
     .usart_id = 0,
     .cdc_supported = 1,
     .cdc_settings_change = 1,
+    .xonxoff_enabled = 0,
 
 };
+
 ISR(USART0_Handler)
 {
 	generic_isr(&usart0_driver);
 }
+
+// enable clock and IO pins and ISR for USART0
 void usart0_enableIO(void)
 {
 	sysclk_enable_peripheral_clock(ID_USART0);
-	#if USB_DEVICE_PRODUCT_ID != 0xC310
-	gpio_configure_pin(PIN_USART0_RXD, PIN_USART0_RXD_FLAGS);
-	gpio_configure_pin(PIN_USART0_TXD, PIN_USART0_TXD_FLAGS);
+	#if (USB_DEVICE_PRODUCT_ID == 0xC310) || (USB_DEVICE_PRODUCT_ID == 0xC340)
+    if (FPGA_PINS_ON) {
+        gpio_configure_pin(PIN_USART0_RXD, PIN_USART0_RXD_FLAGS);
+        gpio_configure_pin(PIN_USART0_TXD, PIN_USART0_TXD_FLAGS);
+    }
+    #else
+        gpio_configure_pin(PIN_USART0_RXD, PIN_USART0_RXD_FLAGS);
+        gpio_configure_pin(PIN_USART0_TXD, PIN_USART0_TXD_FLAGS);
 	#endif
 	irq_register_handler(USART0_IRQn, 3);
+}
+
+void usart0_tx_break(void)
+{
+	#if (USB_DEVICE_PRODUCT_ID == 0xC310) || (USB_DEVICE_PRODUCT_ID == 0xC340)
+    if (FPGA_PINS_ON) {
+        gpio_configure_pin(PIN_USART0_TXD, PIO_OUTPUT_0 | PIO_DEFAULT);
+    }
+    #endif
 }
 #else
 void usart0_enableIO(void)
 {
 	
+}
+void usart0_tx_break(void)
+{
+
 }
 #endif
 
@@ -234,6 +274,7 @@ usart_driver usart1_driver = {
     .usart_id = 1,
     .cdc_supported = 1,
     .cdc_settings_change = 1,
+    .xonxoff_enabled = 0,
 
 };
 ISR(USART1_Handler)
@@ -244,17 +285,34 @@ ISR(USART1_Handler)
 void usart1_enableIO(void)
 {
 	sysclk_enable_peripheral_clock(ID_USART1);
-	
-	#if USB_DEVICE_PRODUCT_ID != 0xC310
-	gpio_configure_pin(PIN_USART1_RXD_IDX, PIN_USART1_RXD_FLAGS);
-	gpio_configure_pin(PIN_USART1_TXD_IDX, PIN_USART1_TXD_FLAGS);
+	#if (USB_DEVICE_PRODUCT_ID == 0xC310) || (USB_DEVICE_PRODUCT_ID == 0xC340)
+    if (FPGA_PINS_ON) {
+        gpio_configure_pin(PIN_USART1_RXD, PIN_USART1_RXD_FLAGS);
+        gpio_configure_pin(PIN_USART1_TXD, PIN_USART1_TXD_FLAGS);
+    }
+    #else
+        gpio_configure_pin(PIN_USART1_RXD, PIN_USART1_RXD_FLAGS);
+        gpio_configure_pin(PIN_USART1_TXD, PIN_USART1_TXD_FLAGS);
 	#endif
 	irq_register_handler(USART1_IRQn, 3);
+}
+
+void usart1_tx_break(void)
+{
+	#if (USB_DEVICE_PRODUCT_ID == 0xC310) || (USB_DEVICE_PRODUCT_ID == 0xC340)
+    if (FPGA_PINS_ON) {
+        gpio_configure_pin(PIN_USART1_TXD, PIO_OUTPUT_0 | PIO_DEFAULT);
+    }
+    #endif
 }
 #else
 void usart1_enableIO(void)
 {
 	
+}
+void usart1_tx_break(void)
+{
+
 }
 #endif
 
@@ -272,6 +330,10 @@ void usart2_enableIO(void)
 {
 	
 }
+void usart2_tx_break(void)
+{
+	
+}
 #endif
 
 #ifdef CW_USE_USART3
@@ -282,6 +344,7 @@ usart_driver usart3_driver = {
     .usart_id = 3,
     .cdc_supported = 1,
     .cdc_settings_change = 1,
+    .xonxoff_enabled = 0,
 
 };
 ISR(USART3_Handler)
@@ -291,14 +354,34 @@ ISR(USART3_Handler)
 void usart3_enableIO(void)
 {
 	sysclk_enable_peripheral_clock(ID_USART3);
-	gpio_configure_pin(PIN_USART3_RXD, PIN_USART3_RXD_FLAGS);
-	gpio_configure_pin(PIN_USART3_TXD, PIN_USART3_TXD_FLAGS);
+	#if (USB_DEVICE_PRODUCT_ID == 0xC310) || (USB_DEVICE_PRODUCT_ID == 0xC340)
+    if (FPGA_PINS_ON) {
+        gpio_configure_pin(PIN_USART3_RXD, PIN_USART3_RXD_FLAGS);
+        gpio_configure_pin(PIN_USART3_TXD, PIN_USART3_TXD_FLAGS);
+    }
+    #else
+        gpio_configure_pin(PIN_USART3_RXD, PIN_USART3_RXD_FLAGS);
+        gpio_configure_pin(PIN_USART3_TXD, PIN_USART3_TXD_FLAGS);
+	#endif
 	irq_register_handler(USART3_IRQn, 3);
+}
+
+void usart1_tx_break(void)
+{
+	#if (USB_DEVICE_PRODUCT_ID == 0xC310) || (USB_DEVICE_PRODUCT_ID == 0xC340)
+    if (FPGA_PINS_ON) {
+        gpio_configure_pin(PIN_USART3_TXD, PIO_OUTPUT_0 | PIO_DEFAULT);
+    }
+    #endif
 }
 #else
 void usart3_enableIO(void)
 {
 	
+}
+void usart3_tx_break(void)
+{
+
 }
 #endif
 
@@ -307,7 +390,7 @@ void usart_dummy_func(void)
 
 }
 
-
+// Enable IO/ISR/Clock for a given driver
 void usart_enableIO(usart_driver *driver)
 {
     if (driver->usart_id == 0) {
@@ -321,29 +404,100 @@ void usart_enableIO(usart_driver *driver)
     }
 }
 
+// Set TX pin low for a given driver
+void usart_tx_break(usart_driver *driver)
+{
+    if (driver->usart_id == 0) {
+        usart0_tx_break();
+    } else if (driver->usart_id == 1) {
+        usart1_tx_break();
+    } else if (driver->usart_id == 2) {
+        usart2_tx_break();
+    } else if (driver->usart_id == 3) {
+        usart3_tx_break();
+    }
+}
+
+void usart_handle_xoff(usart_driver *driver)
+{
+    driver->currently_xoff = 1;
+    // should do everything else next time it tries to send a char
+    // if (usart_get_interrupt_mask(driver)) {
+
+    // }
+}
+
+void usart_handle_xon(usart_driver *driver)
+{
+    // disable xoff
+    driver->currently_xoff = 0;
+
+    // rerun ISR
+    // don't think I need this, as it's called via the ISR
+    // generic_isr(driver);
+}
+
+// Handle TX/RX for usart in an interrupt
 void generic_isr(usart_driver *driver)
 {
 	uint32_t status;
 	status = usart_get_status(driver->usart);
+    uint8_t port = driver_to_port(driver); // get CDC port that corresponds to current driver
+
+    // Handle RX
 	if (status & US_CSR_RXRDY){
 		uint32_t temp;
 		temp = driver->usart->US_RHR & US_RHR_RXCHR_Msk;
+
+        // add to normal RX buffers, gets sent back when target.read() is called
 		add_to_circ_buf(&driver->rxbuf, temp, false);
-        if (driver->cdc_enabled)
-            add_to_circ_buf(&driver->rx_cdc_buf, temp, false);
+
+        // write to CDC buffer, gets sent back whenever the OS desides it's time
+        udi_cdc_multi_putc(port, temp);
+
+        // record if an RX overrun happened
+        if (driver->rxbuf.dropped > 0) {
+            CURRENT_ERRORS |= CW_ERR_USART_RX_OVERFLOW;
+        }
+
+        if (driver->xonxoff_enabled) {
+            if (temp == USART_XOFF) {
+                usart_handle_xoff(driver);
+            } else if (temp == USART_XON) {
+                usart_handle_xon(driver);
+            }
+        }
 	}
 	
+    // Handle TX
 	if (status & US_CSR_TXRDY){
+        
+        // if XOFF, don't send anything
+        if (driver->xonxoff_enabled) {
+            if (driver->currently_xoff) {
+                return;
+            }
+        }
+
+        // If the TX buffer still has characters, send out the next
 		if (circ_buf_has_char(&driver->txbuf)){
-			//Still data to send
 			usart_putchar(driver->usart, get_from_circ_buf(&driver->txbuf));			
+
+        // Otherwise, if the CDC RX buffer has data, send that out
+        } else if (udi_cdc_multi_get_nb_received_data(port) > 0) {
+            // Check for CDC characters
+            uint8_t c = 0;
+            udi_cdc_multi_read_buf(port, &c, 1);
+            usart_putchar(driver->usart, c);
+        
+        // Otherwise, no more data available, so disable interrupt on TX done
 		} else {
-			//No more data, stop this madness
 			usart_disable_interrupt(driver->usart, UART_IER_TXRDY);
 		}
 	}
 }
 
+// Handle USART control IN messages (SAM->PC)
 bool ctrl_usart_in(void)
 {
     usart_driver *driver = get_nth_available_driver(udd_g_ctrlreq.req.wValue >> 8);
@@ -357,17 +511,20 @@ bool ctrl_usart_in(void)
     case USART_WVREQ_INIT:
         return true;
         
+    // number of available RX characters to send to PC
     case USART_WVREQ_NUMWAIT:
         if (udd_g_ctrlreq.req.wLength < 4) {
             return false;
         }
-
         udd_g_ctrlreq.payload = respbuf;
         udd_g_ctrlreq.payload_size = 4;
         cnt = circ_buf_count(&driver->rxbuf);
+        driver->rxbuf.dropped = 0; //clear dropped characters
         word2buf(respbuf, cnt);
+        CURRENT_ERRORS &= ~CW_ERR_USART_RX_OVERFLOW;
         return true;
     
+    // number of TX characters we haven't sent yet
     case USART_WVREQ_NUMWAIT_TX:
         if (udd_g_ctrlreq.req.wLength < 4) {
             return false;
@@ -375,16 +532,25 @@ bool ctrl_usart_in(void)
         udd_g_ctrlreq.payload = respbuf;
         udd_g_ctrlreq.payload_size = 4;
         cnt = circ_buf_count(&driver->txbuf);
+        driver->txbuf.dropped = 0; //clear dropped characters
         word2buf(respbuf, cnt);
+        CURRENT_ERRORS &= ~CW_ERR_USART_TX_OVERFLOW;
         return true;
-
-
-
+    case USART_WVREQ_XONXOFF:
+        if (udd_g_ctrlreq.req.wLength < 1) {
+            return false;
+        }
+        udd_g_ctrlreq.payload = respbuf;
+        udd_g_ctrlreq.payload_size = 1;
+        if (!driver->xonxoff_enabled) driver->currently_xoff = 0;
+        respbuf[0] = driver->xonxoff_enabled | (driver->currently_xoff << 1);
+        return true;
     }
 
     return false;
 }
 
+// configure USART baud, other settings
 bool configure_usart(usart_driver *driver, uint32_t baud, uint8_t stop_bits, uint8_t parity, uint8_t dbits)
 {
     driver->usartopts.baudrate = baud;
@@ -442,17 +608,23 @@ bool configure_usart(usart_driver *driver, uint32_t baud, uint8_t stop_bits, uin
             driver->usartopts.char_length = US_MR_CHRL_8_BIT;
         }
         
+    // Not loopback or anything weird, for example
     driver->usartopts.channel_mode = US_MR_CHMODE_NORMAL;
-    usart_enableIO(driver);
-    driver->enabled = 1;
-    init_circ_buf(&driver->txbuf);
-    init_circ_buf(&driver->rxbuf);
-    init_circ_buf(&driver->rx_cdc_buf);
 
+    // Enable IO pins and buffers
+    usart_enableIO(driver);
+    if (!driver->enabled) {
+        driver->enabled = 1;
+        init_circ_buf(&driver->txbuf);
+        init_circ_buf(&driver->rxbuf);
+    }
+
+    // Apply settings
     usart_init_rs232(driver->usart, &driver->usartopts, sysclk_get_cpu_hz());
     return true;
 }
 
+// Handle USART control OUT messages (PC->SAM)
 void ctrl_usart_out(void)
 {
     usart_driver *driver = get_nth_available_driver(udd_g_ctrlreq.req.wValue >> 8);
@@ -460,6 +632,7 @@ void ctrl_usart_out(void)
 
     uint32_t baud;
 
+    // Init USART with baud, other settings
     switch (udd_g_ctrlreq.req.wValue & 0xFF) {
     case USART_WVREQ_INIT:
         if (udd_g_ctrlreq.req.wLength != 7) return;
@@ -471,6 +644,7 @@ void ctrl_usart_out(void)
 
         return ;
 
+    // Enable USART
     case USART_WVREQ_ENABLE:
 		usart_enableIO(driver);
         usart_enable_rx(driver->usart);
@@ -480,28 +654,35 @@ void ctrl_usart_out(void)
         
 		return;
 
+    // Disable USART
     case USART_WVREQ_DISABLE:
         usart_disable_rx(driver->usart);
         usart_disable_tx(driver->usart);
         usart_disable_interrupt(driver->usart, UART_IER_RXRDY | UART_IER_TXRDY);
         return ;
-
-
+    case USART_WVREQ_XONXOFF:
+        driver->xonxoff_enabled = udd_g_ctrlreq.payload[0];
+        if (!driver->xonxoff_enabled) driver->currently_xoff = 0;
+        return;
     }
-
 }
 
+// Handle PC->SAM USART data packets
+// Basically, if a TX isn't currently ongoing, send the first character, enable interrupt, write the rest to a buffer
 void usart_driver_putchar(usart_driver *driver, uint8_t data)
 {
-
+    // Add new characters to TX buffer
     add_to_circ_buf(&driver->txbuf, data, false);
 
-	// Send the first byte if nothing is yet being sent
-	// This is determined by seeing if the TX complete interrupt is
-	// enabled.
+
+    // Check if a transmission is ongoing
 	if ((usart_get_interrupt_mask(driver->usart) & US_CSR_TXRDY) == 0) {
-		if ((usart_get_status(driver->usart) & US_CSR_TXRDY))
-			usart_putchar(driver->usart, get_from_circ_buf(&driver->txbuf));
+        // If not, send out the first character and enable interrupt on TX sent
+		if ((usart_get_status(driver->usart) & US_CSR_TXRDY)){
+            if (!driver->currently_xoff || !driver->xonxoff_enabled) {
+                usart_putchar(driver->usart, get_from_circ_buf(&driver->txbuf));
+            }
+        }
 		usart_enable_interrupt(driver->usart, US_CSR_TXRDY);
 	}
 }
@@ -529,6 +710,12 @@ usart_driver *get_usart_from_id(int id)
     return NULL;
 }
 
+/*
+Get the nth usart driver in use.
+
+e.g. if we use USART1 and USART3, then port=0 returns driver 1
+and port=1 returns driver 3
+*/
 usart_driver *get_nth_available_driver(int port)
 {
 	usart_driver *driver;
@@ -543,12 +730,25 @@ usart_driver *get_nth_available_driver(int port)
 	return driver;
 }
 
+// Inverse of above function
+int driver_to_port(usart_driver *driver)
+{
+    usart_driver *potential_driver = NULL;
+    for (uint8_t i = 0; i < 4; i++) {
+        if (get_nth_available_driver(i) == driver) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// USB callback for control OUT messages
 static void ctrl_usart_cb(void)
 {
-	
 	ctrl_usart_out();
 }
 
+// USB callback for data (TX) messages
 static void ctrl_usart_cb_data(void)
 {		
 	usart_driver *driver = get_nth_available_driver(udd_g_ctrlreq.req.wValue >> 8);
@@ -561,6 +761,11 @@ static void ctrl_usart_cb_data(void)
 	for (int i = 0; i < udd_g_ctrlreq.req.wLength; i++){
 		usart_driver_putchar(driver, udd_g_ctrlreq.payload[i]);
 	}
+
+    // Record if we overran the TX buffer
+    if (driver->txbuf.dropped > 0) {
+        CURRENT_ERRORS |= CW_ERR_USART_TX_OVERFLOW;
+    }
 }
 
 #ifdef CW_PROG_XMEGA
@@ -591,8 +796,11 @@ void naeusart_register_handlers(void)
 
 //////CDC FUNC
 
+/*
+Enable or disable allowing serial consoles to change serial settings
 
-
+Currently does nothing
+*/
 void naeusb_cdc_settings_out(void)
 {
     for (uint8_t i = 0; i < 4; i++) {
@@ -621,6 +829,7 @@ bool naeusb_cdc_settings_in(void)
 
 }
 
+// Honestly, not sure when this gets called, so basically does nothing currently
 bool cdc_enable(uint8_t port)
 {
 	usart_driver *driver = get_nth_available_driver(port);
@@ -629,39 +838,52 @@ bool cdc_enable(uint8_t port)
     return true;
 }
 
+// Honestly, not sure when this gets called, so basically does nothing currently
 void cdc_disable(uint8_t port)
 {
 	usart_driver *driver = get_nth_available_driver(port);
 
     driver->cdc_enabled = 0;
-    NAEUSB_CDC_IS_RUNNING = false;
+    // NAEUSB_CDC_IS_RUNNING = false;
 }
 
-uint8_t uart_buf[512] = {0};
+/*
+Function that gets called when the PC has sent serial data to us.
+
+Basically mimic the way the the normal TX functions:
+
+1. Send a character if there isn't already one being sent
+2. Send the rest in interrupt
+
+See usart_driver_putchar()
+*/
 void my_callback_rx_notify(uint8_t port)
 {
-
 	usart_driver *driver = get_nth_available_driver(port);
-    NAEUSB_CDC_IS_RUNNING = true;
-    
-    if (driver->cdc_enabled && driver->enabled) {
-        iram_size_t num_char = udi_cdc_multi_get_nb_received_data(port);
-        while (num_char > 0) {
-            num_char = (num_char > 512) ? 512 : num_char;
-            udi_cdc_multi_read_buf(port, uart_buf, num_char);
-            for (uint16_t i = 0; i < num_char; i++) {
-                usart_driver_putchar(driver, uart_buf[i]);
+
+    // If we somehow don't have anything to send, do nothing
+    iram_size_t num_char = udi_cdc_multi_get_nb_received_data(port);
+    if (num_char == 0) {
+        return;
+    }
+
+    // See usart_driver_putchar()
+    if ((usart_get_interrupt_mask(driver->usart) & US_CSR_TXRDY) == 0) {
+        if ((usart_get_status(driver->usart) & US_CSR_TXRDY)) {
+            if (!driver->currently_xoff || !driver->xonxoff_enabled) {
+                usart_putchar(driver->usart, udi_cdc_multi_getc(port));
             }
-            num_char = udi_cdc_multi_get_nb_received_data(port);
         }
+        usart_enable_interrupt(driver->usart, US_CSR_TXRDY);
     }
 }
 
+// This gets called when the PC wants to change serial settings
 void my_callback_config(uint8_t port, usb_cdc_line_coding_t * cfg)
 {
 	usart_driver *driver = get_nth_available_driver(port);
 
-    if (driver->cdc_enabled) {
+    // if (driver->cdc_enabled && driver->cdc_settings_change) {
         uint32_t baud = cfg->dwDTERate;
 
         uint8_t stop_bits = ((uint32_t)cfg->bCharFormat) << 12;
@@ -686,20 +908,25 @@ void my_callback_config(uint8_t port, usb_cdc_line_coding_t * cfg)
             default:
             return;
         }
-		
 
 
+		usart_enableIO(driver);
         configure_usart(driver, baud, stop_bits, parity_type, dbits);
-		if (!(usart_get_interrupt_mask(driver->usart) & UART_IER_RXRDY)) {
-			usart_enable_rx(driver->usart);
-			usart_enable_tx(driver->usart);
+        usart_enable_rx(driver->usart);
+        usart_enable_tx(driver->usart);
 
-			usart_enable_interrupt(driver->usart, UART_IER_RXRDY);
-		}
+        usart_enable_interrupt(driver->usart, UART_IER_RXRDY);
+		// if (!(usart_get_interrupt_mask(driver->usart) & UART_IER_RXRDY)) {
+		// 	usart_enable_rx(driver->usart);
+		// 	usart_enable_tx(driver->usart);
+
+		// 	usart_enable_interrupt(driver->usart, UART_IER_RXRDY);
+		// }
 		
-    }
+    // }
 }
 
+// Handle USB OUT
 bool usart_setup_out_received(void)
 {
     switch(udd_g_ctrlreq.req.bRequest) {
@@ -740,6 +967,8 @@ bool usart_setup_out_received(void)
     return false;
 }
 
+
+// Handle USB IN
 bool usart_setup_in_received(void)
 {
     switch(udd_g_ctrlreq.req.bRequest) {
@@ -752,7 +981,8 @@ bool usart_setup_in_received(void)
         unsigned int cnt;
 		usart_driver *driver = get_nth_available_driver(udd_g_ctrlreq.req.wValue >> 8);
 		if (!driver) return false;
-        for(cnt = 0; cnt < udd_g_ctrlreq.req.wLength; cnt++){
+        unsigned int data = (udd_g_ctrlreq.req.wLength > 128) ? 128 : udd_g_ctrlreq.req.wLength;
+        for(cnt = 0; cnt < data; cnt++){
             respbuf[cnt] = usart_driver_getchar(driver);
         }
         udd_g_ctrlreq.payload = respbuf;
@@ -791,18 +1021,37 @@ bool usart_setup_in_received(void)
     return false;
 }
 
-void cdc_send_to_pc(void)
+bool naeusb_cdc_handle_send_break(uint8_t port, uint16_t wValue)
 {
-    // if (!NAEUSB_CDC_IS_RUNNING) return; //fixes Pro streaming requiring connection to CDC
-	for (uint8_t i = 0; i < 4; i++) {
-		usart_driver *driver = get_nth_available_driver(i);
-		if (!driver) continue;
-		if (driver->cdc_enabled && driver->enabled && udi_cdc_multi_is_tx_ready(i)) {
-			while (circ_buf_has_char(&driver->rx_cdc_buf)) {
-				udi_cdc_multi_putc(i, get_from_circ_buf(&driver->rx_cdc_buf));
-			}
-		}
+    usart_driver *driver = get_nth_available_driver(port);
+    if (!driver) return false;
 
-	}
-	
+    switch(wValue) {
+        case 0xFFFF:
+            usart_tx_break(driver);
+            return true;
+        case 0x0000:
+            usart_enableIO(driver);
+            return true;
+        default:
+        return true;
+    }
 }
+
+// previously we handled SAM->PC CDC here. We no longer do this
+
+// void cdc_send_to_pc(void)
+// {
+//     // if (!NAEUSB_CDC_IS_RUNNING) return; //fixes Pro streaming requiring connection to CDC
+// 	for (uint8_t i = 0; i < 4; i++) {
+// 		usart_driver *driver = get_nth_available_driver(i);
+// 		if (!driver) continue;
+// 		if (driver->enabled && udi_cdc_multi_is_tx_ready(i)) {
+// 			while (circ_buf_has_char(&driver->rx_cdc_buf)) {
+// 				udi_cdc_multi_putc(i, get_from_circ_buf(&driver->rx_cdc_buf));
+// 			}
+// 		}
+
+// 	}
+	
+// }

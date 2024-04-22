@@ -7,6 +7,13 @@
 #define RSTC_CR_KEY_PASSWD RSTC_CR_KEY(0xA5)
 #endif
 
+uint8_t LED_SETTING = 0;
+uint16_t CURRENT_ERRORS = 0;
+
+volatile const uint8_t fw_major = FW_VER_MAJOR;
+volatile const uint8_t fw_minor = FW_VER_MINOR;
+volatile const uint8_t fw_debug = FW_VER_DEBUG;
+
 bool naeusb_sam_status_in(void)
 {
     return false;
@@ -62,7 +69,21 @@ void naeusb_sam_cfg_out(void)
 	#endif
         break;
 
+    case SAM_LED_SETTINGS:
+        LED_SETTING = (udd_g_ctrlreq.req.wValue >> 8) & 0xFF;
+        #ifdef LED1_GPIO
+            if (LED_SETTING == 0) {
+                LED_Off(LED1_GPIO);
+            }
+        #endif
+        break;
+
+    case SAM_CLEAR_ERRORS:
+        CURRENT_ERRORS = 0;
+        break;
+
         /* Oh well, sucks to be you */
+
 
     default:
         break;
@@ -71,9 +92,9 @@ void naeusb_sam_cfg_out(void)
 
 bool naeusb_fw_version_in(void)
 {
-    respbuf[0] = FW_VER_MAJOR;
-    respbuf[1] = FW_VER_MINOR;
-    respbuf[2] = FW_VER_DEBUG;
+    respbuf[0] = fw_major;
+    respbuf[1] = fw_minor;
+    respbuf[2] = fw_debug;
     udd_g_ctrlreq.payload = respbuf;
     udd_g_ctrlreq.payload_size = 3;
     return true;
@@ -92,6 +113,16 @@ bool naeusb_build_date_in(void)
     return true;
 }
 
+bool naeusb_status_in(void)
+{
+    respbuf[0] = CURRENT_ERRORS & 0xFF;
+    respbuf[1] = CURRENT_ERRORS >> 8;
+    respbuf[2] = LED_SETTING;
+    udd_g_ctrlreq.payload = respbuf;
+    udd_g_ctrlreq.payload_size = 3;
+    return true;
+}
+
 
 bool naeusb_setup_out_received(void)
 {
@@ -104,6 +135,7 @@ bool naeusb_setup_out_received(void)
     return false;
 }
 
+
 bool naeusb_setup_in_received(void)
 {
     switch (udd_g_ctrlreq.req.bRequest) {
@@ -112,6 +144,9 @@ bool naeusb_setup_in_received(void)
             break;
         case REQ_BUILD_DATE:
             return naeusb_build_date_in();
+            break;
+        case REQ_SAM_STATUS:
+            return naeusb_status_in();
             break;
     }
     return false;
