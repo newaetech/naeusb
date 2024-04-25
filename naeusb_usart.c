@@ -453,7 +453,9 @@ void generic_isr(usart_driver *driver)
 		add_to_circ_buf(&driver->rxbuf, temp, false);
 
         // write to CDC buffer, gets sent back whenever the OS desides it's time
-        udi_cdc_multi_putc(port, temp);
+        if (udi_cdc_multi_is_tx_ready(port)) {
+            udi_cdc_multi_putc(port, temp);
+        }
 
         // record if an RX overrun happened
         if (driver->rxbuf.dropped > 0) {
@@ -861,21 +863,25 @@ void my_callback_rx_notify(uint8_t port)
 {
 	usart_driver *driver = get_nth_available_driver(port);
 
-    // If we somehow don't have anything to send, do nothing
-    iram_size_t num_char = udi_cdc_multi_get_nb_received_data(port);
-    if (num_char == 0) {
-        return;
-    }
+    /*
+    Very important note: Needs to disable interrupts here, as usart interrupt 
+    can also read data and cause multi_getc to block here
+    */
+    irqflags_t flags = cpu_irq_save();
+    volatile iram_size_t num_char = udi_cdc_multi_get_nb_received_data(port);
 
     // See usart_driver_putchar()
     if ((usart_get_interrupt_mask(driver->usart) & US_CSR_TXRDY) == 0) {
         if ((usart_get_status(driver->usart) & US_CSR_TXRDY)) {
             if (!driver->currently_xoff || !driver->xonxoff_enabled) {
-                usart_putchar(driver->usart, udi_cdc_multi_getc(port));
+                if (num_char > 0) {
+                    usart_putchar(driver->usart, udi_cdc_multi_getc(port));
+                }
             }
         }
         usart_enable_interrupt(driver->usart, US_CSR_TXRDY);
     }
+    cpu_irq_restore(flags);
 }
 
 // This gets called when the PC wants to change serial settings
