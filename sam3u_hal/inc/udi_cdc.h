@@ -264,7 +264,7 @@ typedef struct {
    .acm.bFunctionLength          = sizeof(usb_cdc_acm_desc_t),\
    .acm.bDescriptorType          = CDC_CS_INTERFACE,\
    .acm.bDescriptorSubtype       = CDC_SCS_ACM,\
-   .acm.bmCapabilities           = CDC_ACM_SUPPORT_LINE_REQUESTS,\
+   .acm.bmCapabilities           = CDC_ACM_SUPPORT_LINE_REQUESTS | CDC_ACM_SUPPORT_SENDBREAK_REQUESTS,\
    .union_desc.bFunctionLength   = sizeof(usb_cdc_union_desc_t),\
    .union_desc.bDescriptorType   = CDC_CS_INTERFACE,\
    .union_desc.bDescriptorSubtype= CDC_SCS_UNION,\
