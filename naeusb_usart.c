@@ -62,6 +62,10 @@ How USART works on CW:
 #include "V2Protocol.h"
 #endif
 
+#ifdef CW_PROG_NUVOICP
+#include "NuvoICPNewAE.h"
+#endif
+
 #define USART_WVREQ_INIT    0x0010
 #define USART_WVREQ_ENABLE  0x0011
 #define USART_WVREQ_DISABLE 0x0012
@@ -770,6 +774,12 @@ static void ctrl_usart_cb_data(void)
     }
 }
 
+#ifdef CW_PROG_NUVOICP
+void ctrl_n76e003_icp_program_void(void) {
+    NuvoICP_Protocol_Command();
+}
+#endif
+
 #ifdef CW_PROG_XMEGA
 void ctrl_xmega_program_void(void)
 {
@@ -950,6 +960,13 @@ bool usart_setup_out_received(void)
         udd_g_ctrlreq.callback = ctrl_spi1util;
         return true;
 #endif
+
+#ifdef CW_PROG_NUVOICP
+    case REQ_NU51_ICP_PROGRAM:
+        udd_g_ctrlreq.callback = ctrl_n76e003_icp_program_void;
+        return true;
+#endif
+
 #ifdef CW_PROG_XMEGA
     case REQ_XMEGA_PROGRAM:
         /*
@@ -1005,6 +1022,12 @@ bool usart_setup_in_received(void)
             udd_g_ctrlreq.payload = spi1util_data_buffer;
             udd_g_ctrlreq.payload_size = udd_g_ctrlreq.req.wLength;
             return true;
+        break;
+#endif
+
+#ifdef CW_PROG_NUVOICP
+    case REQ_NU51_ICP_PROGRAM:
+        return NuvoICP_Protocol_Command();
         break;
 #endif
 
