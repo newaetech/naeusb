@@ -32,13 +32,13 @@ void openadc_progfpga_bulk(void){
 
     case 0xA1:
         /* Waiting on data... */
+        blockendpoint_usage = bep_fpgabitstream;
         fpga_program_setup2();
-        // blockendpoint_usage = bep_fpgabitstream;
         break;
 
     case 0xA2:
         /* Done */
-        // blockendpoint_usage = bep_emem;
+        blockendpoint_usage = bep_emem;
         fpga_program_finish();
         break;
 
