@@ -21,6 +21,7 @@ CFLAGS += -Wcomment -Wformat=2 --param max-inline-insns-single=500
 CFLAGS += -DDEBUG -DARM_MATH_CM3=true -Dprintf=iprintf -DUDD_ENABLE -Dscanf=iscanf -DPLATFORMCW1190=1
 CFLAGS += -Wno-discarded-qualifiers -Wno-unused-function -Wno-unused-variable -Wno-strict-prototypes -Wno-missing-prototypes
 CFLAGS += -Wno-pointer-sign -Wno-unused-value 
+CFLAGS += -D$(subst -,_,$(TARGET))
 PROGCMD="import sys, time; assert len(sys.argv) > 1; import chipwhisperer as cw; exec('try: scope = cw.scope(); p = cw.SAMFWLoader(scope); p.enter_bootloader(True); time.sleep(2);\nexcept: pass'); cw.program_sam_firmware(fw_path=sys.argv[1])" $(TARGET).bin
 
 ifeq ($(TARGET),ChipWhisperer-Lite)
@@ -28,6 +29,10 @@ ifeq ($(TARGET),ChipWhisperer-Lite)
 	CDC=YES
 	HAL = SAM3U
 else ifeq ($(TARGET),ChipWhisperer-Husky)
+	CFLAGS += -D__SAM3U2C__
+	CDC=YES
+	HAL = SAM3U
+else ifeq ($(TARGET),ChipWhisperer-Husky-Plus)
 	CFLAGS += -D__SAM3U2C__
 	CDC=YES
 	HAL = SAM3U

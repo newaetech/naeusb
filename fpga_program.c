@@ -77,7 +77,8 @@ void fpga_program_setup1(uint32_t prog_freq)
 	/* Init - set program low to erase FPGA */
 	FPGA_NPROG_LOW();
 
-#if (USB_DEVICE_PRODUCT_ID == 0xACE5) || (USB_DEVICE_PRODUCT_ID == 0xC610) || (USB_DEVICE_PRODUCT_ID == 0xC310)
+#if (USB_DEVICE_PRODUCT_ID == 0xACE5) || (USB_DEVICE_PRODUCT_ID == 0xC610) || (USB_DEVICE_PRODUCT_ID == 0xC310) || \
+    (USB_DEVICE_PRODUCT_ID == 0xACE6)
     
     usart_spi_opt_t spiopts;
     spiopts.baudrate = prog_freq;
@@ -141,7 +142,8 @@ void fpga_program_setup2(void)
 /* FPGA Programming Step 3: Send data until done */
 void fpga_program_sendbyte(uint8_t databyte)
 {
-    #if (USB_DEVICE_PRODUCT_ID == 0xACE5) || (USB_DEVICE_PRODUCT_ID == 0xC610)
+    #if (USB_DEVICE_PRODUCT_ID == 0xACE5) || (USB_DEVICE_PRODUCT_ID == 0xC610) || \
+    (USB_DEVICE_PRODUCT_ID == 0xACE6)
 	//For debug only
     //fpga_total_bs_len++;
     usart_putchar(FPGA_PROG_USART, databyte);
