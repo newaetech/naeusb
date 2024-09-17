@@ -6,6 +6,8 @@
 #define REQ_XMEGA_PROGRAM 0x20
 #define REQ_AVR_PROGRAM 0x21
 #define REQ_CDC_SETTINGS_EN 0x31
+#define REQ_NU51_ICP_PROGRAM 0x40
+#define REQ_TEST_THING 0x69
 
 /* Target/Extra SPI Transfer */
 #define REQ_FPGASPI1_XFER 0x35
