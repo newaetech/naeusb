@@ -90,7 +90,7 @@ void ctrl_writemem_ctrl_sam3u(void){
         uint32_t seed = sam3u_mem[0]; // load the seed at addr 0
 
         for(unsigned int b = 0; b < (flags >> 16); b++){
-            FPGA_setlock(fpga_generic);
+            // FPGA_setlock(fpga_generic);
 
             // set the inputs key if needed
             if ((flags >> 1) & 0x1){ // write the key
@@ -106,7 +106,7 @@ void ctrl_writemem_ctrl_sam3u(void){
                     seed += (seed*seed) | 0x5;
                 }
             }
-            FPGA_setlock(fpga_unlocked);
+            // FPGA_setlock(fpga_unlocked);
 
             gpio_set_pin_high(FPGA_TRIGGER_GPIO);
             delay_cycles(50);
@@ -233,10 +233,10 @@ void ctrl_writemem_bulk(void){
     /* Set address */
     //Not required - this is done automatically via the XMEM interface
     //instead of using a "cheater" port.
-	// udd_ep_abort(UDI_VENDOR_EP_BULK_OUT);
+	udd_ep_abort(UDI_VENDOR_EP_BULK_OUT);
     udi_vendor_bulk_out_run(
-            main_buf_loopback,
-            MAIN_LOOPBACK_SIZE,
+            xram + bulk_fpga_write_addr,
+            0xFFFFFFFF,
             main_vendor_bulk_out_received);
 
     /* Transaction done in generic callback */
@@ -269,11 +269,22 @@ void ctrl_progfpga_bulk(void){
         case 0xA1:
             /* Waiting on data... */
             fpga_program_setup2();
+
+            // set bulk usage to FPGA bitstream program
             blockendpoint_usage = bep_fpgabitstream;
+
+            // abort setup for normal (FPGA register) transfer
+            udd_ep_abort(UDI_VENDOR_EP_BULK_OUT);
+
+            // setup transfer into normal memory (will be transferred into FPGA in callback)
+            udi_vendor_bulk_out_run(
+                    main_buf_loopback,
+                    sizeof(main_buf_loopback),
+                    main_vendor_bulk_out_received);
             break;
 
         case 0xA2:
-            /* Done */
+            /* Done with programming, set bulk usage back to FPGA register writes */
             blockendpoint_usage = bep_emem;
             break;
 
@@ -299,29 +310,35 @@ void main_vendor_bulk_out_received(udd_ep_status_t status,
     }
 
     if (blockendpoint_usage == bep_emem){
-        for(unsigned int i = 0; i < nb_transfered; i++){
-            xram[i + bulk_fpga_write_addr] = main_buf_loopback[i];
-        }
+        // for(unsigned int i = 0; i < nb_transfered; i++) {
+        //     xram[i + bulk_fpga_write_addr] = main_buf_loopback[i];
+        // }
 
-        if (FPGA_lockstatus() == fpga_blockout){
-            FPGA_setlock(fpga_unlocked);
-        }
+        // if (FPGA_lockstatus() == fpga_blockout){
+        //     FPGA_setlock(fpga_unlocked);
+        // }
+
+        // Use DMA to do transfer
+        udi_vendor_bulk_out_run(
+                xram + bulk_fpga_write_addr,
+                0xFFFFFFFF,
+                main_vendor_bulk_out_received);
     } else if (blockendpoint_usage == bep_fpgabitstream) {
 
         /* Send byte to FPGA - this could eventually be done via SPI */
         for(unsigned int i = 0; i < nb_transfered; i++){
             fpga_program_sendbyte(main_buf_loopback[i]);
         }
+        udi_vendor_bulk_out_run(
+                main_buf_loopback,
+                sizeof(main_buf_loopback),
+                main_vendor_bulk_out_received);
 
         // FPGA_CCLK_LOW();
     }
 
     //printf("BULKOUT: %d bytes\n", (int)nb_transfered);
 
-    udi_vendor_bulk_out_run(
-            main_buf_loopback,
-            sizeof(main_buf_loopback),
-            main_vendor_bulk_out_received);
 }
 
 static void ctrl_cdce906_cb(void)
