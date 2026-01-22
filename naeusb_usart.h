@@ -1,15 +1,24 @@
 #pragma once
 #include "naeusb.h"
 
+// Ctrl Write
+// wValue top byte selects which UART to use (0-3)
+#define REQ_USART0_DATA 0x1A // Writes data to be handled by UART buffer
+#define REQ_USART0_CONFIG 0x1B
+#define REQ_XMEGA_PROGRAM 0x20
+#define REQ_AVR_PROGRAM 0x21
+#define REQ_CDC_SETTINGS_EN 0x31
+#define REQ_FPGASPI1_XFER 0x35
+
+// Ctrl Read
 #define REQ_USART0_DATA 0x1A
 #define REQ_USART0_CONFIG 0x1B
 #define REQ_XMEGA_PROGRAM 0x20
 #define REQ_AVR_PROGRAM 0x21
 #define REQ_CDC_SETTINGS_EN 0x31
-
-/* Target/Extra SPI Transfer */
 #define REQ_FPGASPI1_XFER 0x35
 
+// USART settings/info struct
 typedef struct {
 	Usart * usart;
 	sam_usart_opt_t usartopts;
