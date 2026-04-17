@@ -34,8 +34,8 @@
 #include <stdbool.h>
 
 #ifndef CIRCBUFSIZE
-#define CIRCBUFSIZE 200
-#define CIRCBUFHALF 100
+#define CIRCBUFSIZE 512
+#define CIRCBUFHALF 512/2
 #endif
 
 #define SERIAL_ERR 0xFF
