@@ -1,6 +1,7 @@
 #include "naeusb_default.h"
 #include "usart_driver.h"
 #include <string.h>
+#include <stdarg.h>
 
 
 #ifndef RSTC_CR_KEY_PASSWD
@@ -13,6 +14,18 @@ uint16_t CURRENT_ERRORS = 0;
 volatile const uint8_t fw_major = FW_VER_MAJOR;
 volatile const uint8_t fw_minor = FW_VER_MINOR;
 volatile const uint8_t fw_debug = FW_VER_DEBUG;
+
+uint8_t DEBUG_BUFFER[512];
+int32_t DEBUG_LEFT = 512;
+void debug_print(const char *fmt, ...)
+{
+    if (DEBUG_LEFT <= 0) return;
+    va_list args;
+    va_start(args, fmt);
+    int len = vsnprintf(DEBUG_BUFFER + 512 - DEBUG_LEFT, DEBUG_LEFT, fmt, args);
+    DEBUG_LEFT -= len;
+    va_end(args);
+}
 
 bool naeusb_sam_status_in(void)
 {
@@ -148,6 +161,9 @@ bool naeusb_setup_in_received(void)
         case REQ_SAM_STATUS:
             return naeusb_status_in();
             break;
+        case REQ_DEBUG_BUF:
+            udd_g_ctrlreq.payload = DEBUG_BUFFER;
+            udd_g_ctrlreq.payload_size = 512 - DEBUG_LEFT;
     }
     return false;
 }

@@ -23,6 +23,7 @@
 #define REQ_SAM_STATUS 0x22 // Reads SAM3U config/settings
 #define REQ_FW_VERSION      0x17 // Reads sam3u firmware version
 #define REQ_BUILD_DATE      0x40 // Reads sam3u firmware build time/date
+#define REQ_DEBUG_BUF 0x41
 
 extern uint8_t LED_SETTING;
 extern uint16_t CURRENT_ERRORS;
@@ -31,3 +32,6 @@ extern uint16_t CURRENT_ERRORS;
 #define CW_ERR_USART_TX_OVERFLOW (1 << 1)
 
 void naeusb_register_handlers(void); // call to register common USB handler functions (should be called in main)
+
+// extern uint8_t *DEBUG_BUFFER;
+void debug_print(const char *fmt, ...);

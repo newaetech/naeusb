@@ -19,25 +19,68 @@
 #define REQ_FPGASPI1_XFER 0x35
 
 // USART settings/info struct
-typedef struct {
-	Usart * usart;
-	sam_usart_opt_t usartopts;
-	tcirc_buf rxbuf;
-	tcirc_buf txbuf;
-	tcirc_buf rx_cdc_buf;
-	int usart_id;
-	int cdc_port;
-	uint8_t cdc_supported:1;
-	uint8_t enabled:1;
-	uint8_t cdc_enabled:1;
-	uint8_t cdc_settings_change:1;
-	uint8_t currently_xoff:1;
-	uint8_t xonxoff_enabled:1;
-} usart_driver;
+// typedef struct {
+// 	Usart * usart;
+// 	sam_usart_opt_t usartopts;
+// 	tcirc_buf rxbuf;
+// 	tcirc_buf txbuf;
+// 	tcirc_buf rx_cdc_buf;
+// 	int usart_id;
+// 	int cdc_port;
+// 	uint8_t cdc_supported:1;
+// 	uint8_t enabled:1;
+// 	uint8_t cdc_enabled:1;
+// 	uint8_t cdc_settings_change:1;
+// 	uint8_t currently_xoff:1;
+// 	uint8_t xonxoff_enabled:1;
+// } usart_driver;
+
+#define USART_BUF_SZ 256
+
+struct dma_state {
+    uint8_t buf[USART_BUF_SZ];
+    Pdc *pdc;
+    Usart *usart;
+
+    union {
+        uint32_t buf_st;
+        uint8_t *buf_st_ptr;
+    };
+
+    union {
+        uint32_t buf_head;
+        uint8_t *buf_head_ptr;
+    };
+
+
+    union {
+        uint32_t buf_end;
+        uint8_t *buf_end_ptr;
+    };
+    uint8_t is_tx;
+	uint16_t buf_sz;
+
+	uint8_t dropped;
+};
+
+struct usart_state {
+    Pdc *pdc;
+    Usart *usart;
+	struct dma_state tx_st;
+	struct dma_state rx_st;
+
+	sam_usart_opt_t opts;
+    uint8_t cdc_enabled;
+    uint8_t xonxoff_enabled;
+    uint8_t currently_xoff;
+    uint8_t usart_id;
+};
+
 
 
 void naeusart_register_handlers(void);
-usart_driver *get_usart_from_id(int id);
-usart_driver *get_nth_available_driver(int id);
+
+int usart_rx_overrun(struct dma_state *state);
+int usart_tx_overrun(struct dma_state *state);
 
 // void cdc_send_to_pc(void);
