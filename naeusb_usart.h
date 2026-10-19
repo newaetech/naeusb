@@ -18,23 +18,6 @@
 #define REQ_CDC_SETTINGS_EN 0x31
 #define REQ_FPGASPI1_XFER 0x35
 
-// USART settings/info struct
-// typedef struct {
-// 	Usart * usart;
-// 	sam_usart_opt_t usartopts;
-// 	tcirc_buf rxbuf;
-// 	tcirc_buf txbuf;
-// 	tcirc_buf rx_cdc_buf;
-// 	int usart_id;
-// 	int cdc_port;
-// 	uint8_t cdc_supported:1;
-// 	uint8_t enabled:1;
-// 	uint8_t cdc_enabled:1;
-// 	uint8_t cdc_settings_change:1;
-// 	uint8_t currently_xoff:1;
-// 	uint8_t xonxoff_enabled:1;
-// } usart_driver;
-
 #define USART_BUF_SZ 256
 
 struct dma_state {
@@ -75,8 +58,6 @@ struct usart_state {
     uint8_t currently_xoff;
     uint8_t usart_id;
 };
-
-
 
 void naeusart_register_handlers(void);
 

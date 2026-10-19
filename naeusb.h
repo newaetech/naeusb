@@ -4,6 +4,7 @@
 #include "conf_usb.h"
 #include "usb.h"
 #define NAEUSB_MAX_HANDLERS 16
+#define NAEUSB_CTRLBUF_SZ 256
 #define CTRLBUFFER_WORDPTR ((uint32_t *) ((void *)ctrlbuffer))
 
 typedef bool (*usb_request_handle_func)(void);
@@ -16,8 +17,8 @@ bool naeusb_add_out_handler(usb_request_handle_func new_handler);
 // NOTE: bulk in handler doesn't make any sense
 bool naeusb_add_bulk_out_handler(usb_bulk_handle_func);
 
-extern COMPILER_WORD_ALIGNED uint8_t ctrlbuffer[128];
-extern COMPILER_WORD_ALIGNED uint8_t respbuf[128];
+extern COMPILER_WORD_ALIGNED uint8_t ctrlbuffer[NAEUSB_CTRLBUF_SZ];
+extern COMPILER_WORD_ALIGNED uint8_t respbuf[NAEUSB_CTRLBUF_SZ];
 
 COMPILER_WORD_ALIGNED
 extern uint8_t main_buf_loopback[MAIN_LOOPBACK_SIZE];

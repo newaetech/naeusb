@@ -65,20 +65,20 @@ static inline char is_dma_wrapped(struct dma_state *dst)
 // 
 uint16_t usart_inwait(struct dma_state *dst)
 {
-    if (is_usart_rx_overrun(dst)) {
-        return dst->buf_sz; // we had overrun, so buffer is full
-    }
 
     if (dst->is_tx) {
-        if (!is_dma_wrapped(dst)) {
-            return dst->buf_head - usart_dma_ptr(dst);
-        } else {
-            return (dst->buf_end - usart_dma_ptr(dst)) + (dst->buf_head - dst->buf_st);
-        }
-    } else {
-        // if (dst->buf_head == usart_dma_ptr(dst)) {
-        //     return dst->buf_sz;
+        return pdc_read_tx_counter(dst->pdc) + pdc_read_tx_next_counter(dst->pdc);
+        // if (!is_dma_wrapped(dst)) {
+        //     return dst->buf_head - usart_dma_ptr(dst);
+        // } else {
+        //     return (dst->buf_end - usart_dma_ptr(dst)) + (dst->buf_head - dst->buf_st);
         // }
+    } else {
+
+        if (is_usart_rx_overrun(dst)) {
+            return dst->buf_sz; // we had overrun, so buffer is full
+        }
+
         if (!is_dma_wrapped(dst)) {
             // if not wrapped, #waiting chars is just diff between read head and dma ptr
             return usart_dma_ptr(dst) - dst->buf_head;
@@ -150,11 +150,26 @@ void check_rx(struct usart_state *ust)
     }
 }
 
+int check_tx(struct usart_state *ust)
+{
+    struct dma_state *dst = &ust->tx_st;
+    if ((ust->pdc->PERIPH_TPR + ust->pdc->PERIPH_TCR) > ust->tx_st.buf_end) {
+        pdc_disable_transfer(ust->pdc, 0xFFFFFFFFF);
+        return -1;
+    } 
+    if ((ust->pdc->PERIPH_TNPR + ust->pdc->PERIPH_TNCR) > ust->tx_st.buf_end) {
+        pdc_disable_transfer(ust->pdc, 0xFFFFFFFFF);
+        return -1;
+    }
+    return 0;
+}
+
 // TODO: Check edge cases
 uint16_t usart_dma_read(struct usart_state *ust, uint8_t *buf, uint16_t len)
 {
     struct dma_state *dst = &ust->rx_st;
     len = min(usart_inwait(dst), len);
+    pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS);
     check_rx(ust);
 
     if (is_usart_rx_overrun(dst)) {
@@ -215,6 +230,7 @@ uint16_t usart_dma_read(struct usart_state *ust, uint8_t *buf, uint16_t len)
         }
     }
     dst->dropped = 0;
+    pdc_enable_transfer(ust->pdc, PERIPH_PTCR_RXTEN);
     return len;
 }
 
@@ -223,11 +239,13 @@ void usart_dma_write(struct usart_state *ust, uint8_t *buf, uint16_t len)
 {
     struct dma_state *dst = &ust->tx_st;
     len = min(usart_free_space(dst), len);
+    pdc_disable_transfer(ust->pdc, PERIPH_PTCR_TXTDIS);
     if (!is_dma_wrapped(dst)) {
-        uint16_t len_to_end = dst->buf_end - dst->buf_head;
+        // do math here with registers?
+        uint16_t len_to_end = dst->buf_end - (dst->pdc->PERIPH_TPR + dst->pdc->PERIPH_TCR);//dst->buf_end - dst->buf_head;
 
         // scenario 1, not wrapped, write stops before end
-        if (len_to_end >= len) {
+        if (len_to_end > len) {
             //copy into buffer
             memcpy(dst->buf_head_ptr, buf, len);
 
@@ -236,6 +254,10 @@ void usart_dma_write(struct usart_state *ust, uint8_t *buf, uint16_t len)
 
             // increase PDC counter by len
             dst->pdc->PERIPH_TCR += len;
+
+            if (check_tx(ust)) {
+                volatile int j = 256;
+            }
 
         // scenario 2, not wrapped, write goes past end
         } else {
@@ -256,6 +278,9 @@ void usart_dma_write(struct usart_state *ust, uint8_t *buf, uint16_t len)
 
             // point head at that new point
             dst->buf_head = dst->buf_st + len - len_to_end;
+            if (check_tx(ust)) {
+                volatile int j = 87;
+            }
         }
     } else {
         // scenario 3, write buffer wraps over end
@@ -268,7 +293,12 @@ void usart_dma_write(struct usart_state *ust, uint8_t *buf, uint16_t len)
 
         // increase PDC next counter by len
         dst->pdc->PERIPH_TNCR += len;
+
+        if (check_tx(ust)) {
+            volatile int j = 12;
+        }
     }
+    pdc_enable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
 }
 
 // naeusart because I wouldn't be surpised if usart_register_handlers collides with something
@@ -297,18 +327,18 @@ void usart_disable_dma(struct      usart_state *dst)
 
 void my_callback_rx_notify(uint8_t port)
 {
-    irqflags_t flags = cpu_irq_save();
-    uint8_t tmp[64];
-    struct usart_state *ust = get_nth_available_driver(port);
-    volatile iram_size_t num_char = min(udi_cdc_multi_get_nb_received_data(port), 64);
+    // irqflags_t flags = cpu_irq_save();
+    // uint8_t tmp[64];
+    // struct usart_state *ust = get_nth_available_driver(port);
+    // volatile iram_size_t num_char = min(udi_cdc_multi_get_nb_received_data(port), 64);
 
-    while (num_char >= 0) {
-        num_char = min(udi_cdc_multi_get_nb_received_data(port), 64);
-        udi_cdc_multi_read_buf(port, tmp, min(num_char, 64));
-        usart_dma_write(ust, tmp, num_char);
-    }
+    // while (num_char >= 0) {
+    //     num_char = min(udi_cdc_multi_get_nb_received_data(port), 64);
+    //     udi_cdc_multi_read_buf(port, tmp, min(num_char, 64));
+    //     usart_dma_write(ust, tmp, num_char);
+    // }
 
-    cpu_irq_restore(flags);
+    // cpu_irq_restore(flags);
 }
 
 void my_callback_config(uint8_t port, usb_cdc_line_coding_t * cfg)
