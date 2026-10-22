@@ -56,6 +56,8 @@ struct usart_state {
 
 	sam_usart_opt_t opts;
     uint8_t cdc_enabled;
+    uint8_t cdc_supported;
+    uint8_t cdc_os_enabled;
     uint8_t xonxoff_enabled;
     uint8_t currently_xoff;
     uint8_t usart_id;

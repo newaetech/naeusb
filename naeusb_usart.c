@@ -38,6 +38,20 @@ bool naeusb_cdc_settings_in(void)
 
 }
 
+void naeusb_cdc_settings_out(void)
+{
+    for (uint8_t i = 0; i < 4; i++) {
+        struct usart_state *driver = get_nth_available_driver(i);
+        if (driver) {
+            if (udd_g_ctrlreq.req.wValue & (1 << i)) {
+                driver->cdc_enabled = 1;
+            } else {
+                driver->cdc_enabled = 0;
+            }
+        }
+    }
+}
+
 #ifdef CW_PROG_XMEGA
 #include "XPROGNewAE.h"
 void ctrl_xmega_program_void(void)
@@ -270,7 +284,7 @@ bool usart_setup_out_received(void)
         return true;
 #endif
     case REQ_CDC_SETTINGS_EN:
-        // udd_g_ctrlreq.callback = naeusb_cdc_settings_out;
+        udd_g_ctrlreq.callback = naeusb_cdc_settings_out;
         return true;
         break;
     }

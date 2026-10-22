@@ -114,6 +114,7 @@ void setup_usart_dma(struct usart_state *ust)
 {
     struct pdc_packet packet;
     struct pdc_packet npacket;
+    pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS | PERIPH_PTCR_TXTDIS);
 
     // setup tx
     setup_dma_state(&ust->tx_st, USART_TX_BUF_SZ);
@@ -328,31 +329,46 @@ void usart_disable_dma(struct      usart_state *dst)
 void my_callback_rx_notify(uint8_t port)
 {
     // irqflags_t flags = cpu_irq_save();
-    // uint8_t tmp[64];
+    // uint8_t tmp[128];
     // struct usart_state *ust = get_nth_available_driver(port);
-    // volatile iram_size_t num_char = min(udi_cdc_multi_get_nb_received_data(port), 64);
+
+    // volatile iram_size_t num_char = min(udi_cdc_multi_get_nb_received_data(port), sizeof(tmp));
 
     // while (num_char >= 0) {
-    //     num_char = min(udi_cdc_multi_get_nb_received_data(port), 64);
-    //     udi_cdc_multi_read_buf(port, tmp, min(num_char, 64));
+    //     num_char = min(udi_cdc_multi_get_nb_received_data(port), sizeof(tmp));
+    //     udi_cdc_multi_read_buf(port, tmp, min(num_char, ));
     //     usart_dma_write(ust, tmp, num_char);
     // }
 
     // cpu_irq_restore(flags);
 }
 
-void my_callback_config(uint8_t port, usb_cdc_line_coding_t * cfg)
+// I think this just tells you data was sent SAM->PC?
+// It's in callback of udd run if n != 0
+void my_callback_tx_empty(uint8_t port)
 {
 
+}
+
+void my_callback_config(uint8_t port, usb_cdc_line_coding_t * cfg)
+{
+    struct usart_state *driver = get_nth_available_driver(port);
+
+    usart_fill_opts(&driver->opts, cfg->dwDTERate, cfg->bCharFormat, cfg->bParityType, cfg->bDataBits);
+    setup_usart_dma(driver);
 }
 
 void cdc_disable(uint8_t port)
 {
-
+    struct usart_state *driver = get_nth_available_driver(port);
+    driver->cdc_os_enabled = 0;
+    return true;
 }
 
 bool cdc_enable(uint8_t port)
 {
+    struct usart_state *driver = get_nth_available_driver(port);
+    driver->cdc_os_enabled = 1;
     return true;
 }
 

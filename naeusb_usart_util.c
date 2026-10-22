@@ -22,6 +22,7 @@ struct usart_state USART0_ST = {
         .is_tx = 0
     },
     .cdc_enabled = 0,
+    .cdc_supported = 1,
     .xonxoff_enabled = 0,
     .currently_xoff = 0,
     .usart_id = 0
