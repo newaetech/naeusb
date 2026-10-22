@@ -4,7 +4,7 @@
 #include "conf_usb.h"
 #include "usb.h"
 #define NAEUSB_MAX_HANDLERS 16
-#define NAEUSB_CTRLBUF_SZ 256
+#define NAEUSB_CTRLBUF_SZ 128
 #define CTRLBUFFER_WORDPTR ((uint32_t *) ((void *)ctrlbuffer))
 
 typedef bool (*usb_request_handle_func)(void);

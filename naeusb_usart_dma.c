@@ -99,10 +99,10 @@ int is_usart_rx_overrun(struct dma_state *dst)
     return (usart_is_rx_buf_full(dst->usart) || (dst->dropped > 0));
 }
 
-static void setup_dma_state(struct dma_state *dst)
+static void setup_dma_state(struct dma_state *dst, uint16_t size)
 {
-    dst->buf_st_ptr = dst->buf;
-    dst->buf_sz = USART_BUF_SZ;
+    // dst->buf_st_ptr = dst->buf;
+    dst->buf_sz = size;
 
     dst->buf_head = dst->buf_st;
 
@@ -116,13 +116,13 @@ void setup_usart_dma(struct usart_state *ust)
     struct pdc_packet npacket;
 
     // setup tx
-    setup_dma_state(&ust->tx_st);
+    setup_dma_state(&ust->tx_st, USART_TX_BUF_SZ);
     packet.ul_addr = ust->tx_st.buf_st;
     packet.ul_size = 0;
     pdc_tx_init(ust->tx_st.pdc, &packet, NULL);
 
     // setup rx
-    setup_dma_state(&ust->rx_st);
+    setup_dma_state(&ust->rx_st, USART_RX_BUF_SZ);
     packet.ul_addr = ust->rx_st.buf_st;
     packet.ul_size = ust->rx_st.buf_sz;
     npacket.ul_addr = ust->rx_st.buf_st;

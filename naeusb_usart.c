@@ -19,6 +19,7 @@
 #define USART_WVREQ_NUMWAIT 0x0014
 #define USART_WVREQ_NUMWAIT_TX 0x0018
 #define USART_WVREQ_XONXOFF 0x0020
+#define USART_WVREQ_BUFSZ 0x0021
 
 #define USART_XON 0x11
 #define USART_XOFF 0x13
@@ -78,7 +79,7 @@ bool ctrl_usart_in(void)
 
         cnt = usart_inwait(&driver->rx_st);
         if (driver->rx_st.dropped > 0) {
-            cnt |= (1 << 16);
+            cnt |= (1 << 31);
         }
         word2buf(respbuf, cnt);
         // CURRENT_ERRORS &= ~CW_ERR_USART_RX_OVERFLOW;
@@ -104,6 +105,15 @@ bool ctrl_usart_in(void)
         udd_g_ctrlreq.payload_size = 1;
         if (!driver->xonxoff_enabled) driver->currently_xoff = 0;
         respbuf[0] = driver->xonxoff_enabled | (driver->currently_xoff << 1);
+        return true;
+    case USART_WVREQ_BUFSZ:
+        if (udd_g_ctrlreq.req.wLength < 4) {
+            return false;
+        }
+        uint32_t buf_sizes = USART_RX_BUF_SZ | (USART_TX_BUF_SZ << 16);
+        udd_g_ctrlreq.payload = respbuf;
+        udd_g_ctrlreq.payload_size = 4;
+        word2buf(respbuf, buf_sizes);
         return true;
     }
 

@@ -19,9 +19,11 @@
 #define REQ_FPGASPI1_XFER 0x35
 
 #define USART_BUF_SZ 256
+#define USART_TX_BUF_SZ 256
+#define USART_RX_BUF_SZ 1024*6
 
 struct dma_state {
-    uint8_t buf[USART_BUF_SZ];
+    // uint8_t buf[USART_BUF_SZ];
     Pdc *pdc;
     Usart *usart;
 

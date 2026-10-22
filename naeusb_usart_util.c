@@ -4,15 +4,19 @@
 
 #ifdef CW_USE_USART0
 // TODO, probably need specific alignment, etc.
+uint8_t USART0_TX_BUF[USART_TX_BUF_SZ];
+uint8_t USART0_RX_BUF[USART_RX_BUF_SZ];
 struct usart_state USART0_ST = {
     .pdc = PDC_USART0,
     .usart = USART0,
     .tx_st = {
+        .buf_st_ptr = USART0_TX_BUF,
         .pdc = PDC_USART0,
         .usart = USART0,
         .is_tx = 1
     },
     .rx_st = {
+        .buf_st_ptr = USART0_RX_BUF,
         .pdc = PDC_USART0,
         .usart = USART0,
         .is_tx = 0
