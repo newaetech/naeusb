@@ -6,7 +6,7 @@
 #include "usb_protocol_cdc.h"
 #include "naeusb_usart.h"
 #include "naeusb_usart_dma.h"
-#include "naeusb_usart_util.h"
+#include "naeusb_usart_impl.h"
 
 #ifdef CW_TARGET_SPI
 #include "naeusb_usart_spi.h"
@@ -228,7 +228,9 @@ void ctrl_usart_cb(void)
         return ;
     case USART_WVREQ_XONXOFF:
         driver->xonxoff_enabled = udd_g_ctrlreq.payload[0];
-        if (!driver->xonxoff_enabled) driver->currently_xoff = 0;
+        if (!driver->xonxoff_enabled) {
+            driver->currently_xoff = 0;
+        }
         return;
     }
 }

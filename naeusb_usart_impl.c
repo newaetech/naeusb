@@ -31,19 +31,9 @@ struct usart_state USART0_ST = {
 ISR(USART0_Handler)
 {
 	handle_rx_usart_overrun_int(&USART0_ST);
+
 }
 
-// struct dma_state TX_DMA_ST0 = {
-//     .pdc = PDC_USART0,
-//     .usart = USART0,
-//     .usart_id = 0
-// };
-// struct dma_state RX_DMA_ST0 = {
-//     .pdc = PDC_USART0,
-//     .usart = USART0,
-//     .usart_id = 0
-// };
-// enable clock and IO pins and ISR for USART0
 void usart0_enableIO(void)
 {
 	sysclk_enable_peripheral_clock(ID_USART0);
@@ -79,16 +69,35 @@ void usart0_tx_break(void)
 #endif
 
 #ifdef CW_USE_USART1
-struct dma_state TX_DMA_ST1 = {
+uint8_t USART1_TX_BUF[USART_TX_BUF_SZ];
+uint8_t USART1_RX_BUF[USART_RX_BUF_SZ];
+struct usart_state USART0_ST = {
     .pdc = PDC_USART1,
     .usart = USART1,
-    .usart_id = 1
+    .tx_st = {
+        .buf_st_ptr = USART1_TX_BUF,
+        .pdc = PDC_USART1,
+        .usart = USART1,
+        .is_tx = 1
+    },
+    .rx_st = {
+        .buf_st_ptr = USART1_RX_BUF,
+        .pdc = PDC_USART1,
+        .usart = USART1,
+        .is_tx = 0
+    },
+    .cdc_enabled = 0,
+    .cdc_supported = 1,
+    .xonxoff_enabled = 0,
+    .currently_xoff = 0,
+    .usart_id = 0
 };
-struct dma_state RX_DMA_ST1 = {
-    .pdc = PDC_USART1,
-    .usart = USART1,
-    .usart_id = 1
-};
+
+ISR(USART1_Handler)
+{
+	handle_rx_usart_overrun_int(&USART1_ST);
+}
+
 void usart1_enableIO(void)
 {
 	sysclk_enable_peripheral_clock(ID_USART1);
@@ -138,16 +147,34 @@ void usart2_tx_break(void)
 #endif
 
 #ifdef CW_USE_USART3
-struct dma_state TX_DMA_ST3 = {
+uint8_t USART3_TX_BUF[USART_TX_BUF_SZ];
+uint8_t USART3_RX_BUF[USART_RX_BUF_SZ];
+struct usart_state USART0_ST = {
     .pdc = PDC_USART3,
     .usart = USART3,
-    .usart_id = 3
+    .tx_st = {
+        .buf_st_ptr = USART3_TX_BUF,
+        .pdc = PDC_USART3,
+        .usart = USART3,
+        .is_tx = 1
+    },
+    .rx_st = {
+        .buf_st_ptr = USART3_RX_BUF,
+        .pdc = PDC_USART3,
+        .usart = USART3,
+        .is_tx = 0
+    },
+    .cdc_enabled = 0,
+    .cdc_supported = 1,
+    .xonxoff_enabled = 0,
+    .currently_xoff = 0,
+    .usart_id = 0
 };
-struct dma_state RX_DMA_ST3 = {
-    .pdc = PDC_USART3,
-    .usart = USART3,
-    .usart_id = 3
-};
+
+ISR(USART3_Handler)
+{
+	handle_rx_usart_overrun_int(&USART3_ST);
+}
 void usart3_enableIO(void)
 {
 	sysclk_enable_peripheral_clock(ID_USART3);
@@ -162,7 +189,7 @@ void usart3_enableIO(void)
 	#endif
 }
 
-void usart1_tx_break(void)
+void usart3_tx_break(void)
 {
 	#if (USB_DEVICE_PRODUCT_ID == 0xC310) || (USB_DEVICE_PRODUCT_ID == 0xC340)
     if (FPGA_PINS_ON) {

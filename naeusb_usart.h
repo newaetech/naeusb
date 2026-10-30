@@ -61,6 +61,7 @@ struct usart_state {
     uint8_t xonxoff_enabled;
     uint8_t currently_xoff;
     uint8_t usart_id;
+    uint32_t errors;
 };
 
 void naeusart_register_handlers(void);

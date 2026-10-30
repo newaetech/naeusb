@@ -6,7 +6,7 @@
 #include "usart.h"
 #include "usb_protocol_cdc.h"
 #include "naeusb_usart.h"
-#include "naeusb_usart_util.h"
+#include "naeusb_usart_impl.h"
 #include "pdc.h"
 
 #ifdef CW_PROG_XMEGA
@@ -68,11 +68,6 @@ uint16_t usart_inwait(struct dma_state *dst)
 
     if (dst->is_tx) {
         return pdc_read_tx_counter(dst->pdc) + pdc_read_tx_next_counter(dst->pdc);
-        // if (!is_dma_wrapped(dst)) {
-        //     return dst->buf_head - usart_dma_ptr(dst);
-        // } else {
-        //     return (dst->buf_end - usart_dma_ptr(dst)) + (dst->buf_head - dst->buf_st);
-        // }
     } else {
 
         if (is_usart_rx_overrun(dst)) {
@@ -177,6 +172,13 @@ uint16_t usart_dma_read(struct usart_state *ust, uint8_t *buf, uint16_t len)
         // scenario 3: overrun, should be handled by others by setting up correct read head?
         uint32_t cur_ptr = usart_dma_ptr(dst);
         dst->buf_head = cur_ptr;
+        #ifdef USART_SW_FLOW_CONTROL
+        // if we support sw flow control, and it's enabled, let the other device know our buffer is full
+        if (ust->xonxoff_enabled) {
+            uint8_t xon = USART_XON;
+            usart_dma_write(ust, &xon, 1);
+        }
+        #endif
     }
 
     // scenario 0: no wrap
@@ -314,14 +316,14 @@ void naeusart_register_handlers(void)
     naeusb_add_out_handler(usart_setup_out_received);
 }
 
-void usart_enable_dma(struct      usart_state *dst)
+void usart_enable_dma(struct      usart_state *ust)
 {
-
+    pdc_enable_transfer(ust->pdc, PERIPH_PTCR_RXTEN | PERIPH_PTCR_TXTEN);
 }
 
-void usart_disable_dma(struct      usart_state *dst)
+void usart_disable_dma(struct      usart_state *ust)
 {
-
+    pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS | PERIPH_PTCR_TXTDIS);
 }
 
 #define CDC_BUF_SZ 64
@@ -385,6 +387,14 @@ void handle_rx_usart_overrun_int(struct usart_state *ust)
         // just dump into buffer
         ust->rx_st.dropped = 1;
 
+        #ifdef USART_SW_FLOW_CONTROL
+        // if we support sw flow control, and it's enabled, let the other device know our buffer is full
+        if (ust->xonxoff_enabled) {
+            uint8_t xoff = USART_XOFF;
+            usart_dma_write(ust, &xoff, 1);
+        }
+        #endif
+
         uint32_t cur_ptr = usart_dma_ptr(&ust->rx_st);
 
         // if we're at the end of buf, start back at beginning
@@ -402,3 +412,22 @@ void handle_rx_usart_overrun_int(struct usart_state *ust)
         pdc_rx_init(ust->rx_st.pdc, &packet, &npacket);
     }
 }
+
+#ifdef USART_SW_FLOW_CONTROL
+void handle_sw_flow_control_int(struct usart_state *ust)
+{
+	uint32_t status;
+	status = usart_get_status(ust->usart);
+
+    if (status & US_CSR_RXRDY) {
+        uint32_t chr = ust->usart->US_RHR & US_RHR_RXCHR_Msk;
+        if (chr == USART_XON) {
+            pdc_enable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
+            ust->currently_xoff = 0;
+        } else if (chr == USART_XOFF) {
+            pdc_disable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
+            ust->currently_xoff = 1;
+        }
+    }
+}
+#endif
