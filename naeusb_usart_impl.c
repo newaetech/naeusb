@@ -57,12 +57,24 @@ void usart0_tx_break(void)
     }
     #endif
 }
+
+uint8_t usart0_is_io_low(void)
+{
+    uint8_t pin_setup = 0;
+    pin_setup |= gpio_pin_is_low(PIN_USART0_RXD);
+    pin_setup |= gpio_pin_is_low(PIN_USART0_TXD) << 1;
+    return pin_setup;
+}
 #else
 void usart0_enableIO(void)
 {
 	
 }
 void usart0_tx_break(void)
+{
+
+}
+uint8_t usart0_is_io_low(void)
 {
 
 }
@@ -120,12 +132,23 @@ void usart1_tx_break(void)
     }
     #endif
 }
+uint8_t usart1_is_io_low(void)
+{
+    uint8_t pin_setup = 0;
+    pin_setup |= gpio_pin_is_low(PIN_USART1_RXD);
+    pin_setup |= gpio_pin_is_low(PIN_USART1_TXD) << 1;
+    return pin_setup;
+}
 #else
 void usart1_enableIO(void)
 {
 	
 }
 void usart1_tx_break(void)
+{
+
+}
+uint8_t usart1_is_io_low(void)
 {
 
 }
@@ -143,6 +166,10 @@ void usart2_enableIO(void)
 void usart2_tx_break(void)
 {
 	
+}
+uint8_t usart2_is_io_low(void)
+{
+
 }
 #endif
 
@@ -197,12 +224,23 @@ void usart3_tx_break(void)
     }
     #endif
 }
+uint8_t usart3_is_io_low(void)
+{
+    uint8_t pin_setup = 0;
+    pin_setup |= gpio_pin_is_low(PIN_USART3_RXD);
+    pin_setup |= gpio_pin_is_low(PIN_USART3_TXD) << 1;
+    return pin_setup;
+}
 #else
 void usart3_enableIO(void)
 {
 	
 }
 void usart3_tx_break(void)
+{
+
+}
+uint8_t usart3_is_io_low(void)
 {
 
 }
@@ -234,6 +272,20 @@ void usart_tx_break(struct usart_state *driver)
     } else if (driver->usart_id == 3) {
         usart3_tx_break();
     }
+}
+
+uint8_t usart_is_io_low(struct usart_state *driver)
+{
+    if (driver->usart_id == 0) {
+        return usart0_is_io_low();
+    } else if (driver->usart_id == 1) {
+        return usart1_is_io_low();
+    } else if (driver->usart_id == 2) {
+        return usart2_is_io_low();
+    } else if (driver->usart_id == 3) {
+        return usart3_is_io_low();
+    }
+    return 0;
 }
 
 

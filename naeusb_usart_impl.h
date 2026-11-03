@@ -9,6 +9,7 @@ struct usart_state *get_usart_from_id(int id);
 void usart_handle_xon(struct usart_state *driver);
 void usart_handle_xoff(struct usart_state *driver);
 void usart_enableIO(struct usart_state *driver);
+uint8_t usart_is_io_low(struct usart_state *driver);
 
 #define word2buf(buf, word)   do{buf[0] = LSB0W(word); buf[1] = LSB1W(word); buf[2] = LSB2W(word); buf[3] = LSB3W(word);}while (0)
 #define buf2word(word, buf)   do{word = *((uint32_t *)buf);}while (0)
