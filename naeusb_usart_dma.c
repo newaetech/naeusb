@@ -7,6 +7,7 @@
 #include "usb_protocol_cdc.h"
 #include "naeusb_usart.h"
 #include "naeusb_usart_impl.h"
+#include "naeusb_usart_dma.h"
 #include "pdc.h"
 
 #ifdef CW_PROG_XMEGA
@@ -35,32 +36,7 @@ void naeusb_cdc_settings_out(void);
 
 int is_usart_rx_overrun(struct dma_state *dst);
 
-static inline uint32_t usart_dma_ptr(struct dma_state *dst)
-{
-    if (dst->is_tx) {
-        return pdc_read_tx_ptr(dst->pdc);
-    } else {
-        return pdc_read_rx_ptr(dst->pdc);
-    }
-}
 
-static inline uint32_t usart_dma_nptr(struct dma_state *dst)
-{
-    if (dst->is_tx) {
-        return pdc_read_tx_next_ptr(dst->pdc);
-    } else {
-        return pdc_read_rx_next_ptr(dst->pdc);
-    }
-}
-
-static inline char is_dma_wrapped(struct dma_state *dst)
-{
-    if (dst->is_tx) {
-        return dst->pdc->PERIPH_TNCR != 0;
-    } else {
-        return (dst->buf_head > usart_dma_ptr(dst)) || ((dst->buf_head != dst->buf_st) && (dst->dropped));
-    }
-}
 
 // 
 uint16_t usart_inwait(struct dma_state *dst)
@@ -137,11 +113,11 @@ void check_rx(struct usart_state *ust)
 {
     struct dma_state *dst = &ust->rx_st;
     if ((ust->pdc->PERIPH_RPR + ust->pdc->PERIPH_RCR) > ust->rx_st.buf_end) {
-        pdc_disable_transfer(ust->pdc, 0xFFFFFFFFF);
+        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS | PERIPH_PTCR_TXTDIS);
         while(1);
     } 
     if ((ust->pdc->PERIPH_RNPR + ust->pdc->PERIPH_RNCR) > ust->rx_st.buf_end) {
-        pdc_disable_transfer(ust->pdc, 0xFFFFFFFFF);
+        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS | PERIPH_PTCR_TXTDIS);
         while(1);
     }
 }
@@ -150,11 +126,11 @@ int check_tx(struct usart_state *ust)
 {
     struct dma_state *dst = &ust->tx_st;
     if ((ust->pdc->PERIPH_TPR + ust->pdc->PERIPH_TCR) > ust->tx_st.buf_end) {
-        pdc_disable_transfer(ust->pdc, 0xFFFFFFFFF);
+        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS | PERIPH_PTCR_TXTDIS);
         return -1;
     } 
     if ((ust->pdc->PERIPH_TNPR + ust->pdc->PERIPH_TNCR) > ust->tx_st.buf_end) {
-        pdc_disable_transfer(ust->pdc, 0xFFFFFFFFF);
+        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS | PERIPH_PTCR_TXTDIS);
         return -1;
     }
     return 0;
@@ -238,7 +214,7 @@ uint16_t usart_dma_read(struct usart_state *ust, uint8_t *buf, uint16_t len)
 }
 
 // TODO: Check edge cases
-void usart_dma_write(struct usart_state *ust, uint8_t *buf, uint16_t len)
+uint16_t usart_dma_write(struct usart_state *ust, uint8_t *buf, uint16_t len)
 {
     struct dma_state *dst = &ust->tx_st;
     len = min(usart_free_space(dst), len);
@@ -302,6 +278,7 @@ void usart_dma_write(struct usart_state *ust, uint8_t *buf, uint16_t len)
         }
     }
     pdc_enable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
+    return len;
 }
 
 // naeusart because I wouldn't be surpised if usart_register_handlers collides with something
@@ -364,7 +341,6 @@ void cdc_disable(uint8_t port)
 {
     struct usart_state *driver = get_nth_available_driver(port);
     driver->cdc_os_enabled = 0;
-    return true;
 }
 
 bool cdc_enable(uint8_t port)

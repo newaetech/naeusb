@@ -222,6 +222,19 @@ void usart_enableIO(struct usart_state *driver)
     }
 }
 
+// Set TX pin low for a given driver
+void usart_tx_break(struct usart_state *driver)
+{
+    if (driver->usart_id == 0) {
+        usart0_tx_break();
+    } else if (driver->usart_id == 1) {
+        usart1_tx_break();
+    } else if (driver->usart_id == 2) {
+        usart2_tx_break();
+    } else if (driver->usart_id == 3) {
+        usart3_tx_break();
+    }
+}
 
 
 // TODO: Fix these
@@ -362,3 +375,20 @@ bool usart_fill_opts(sam_usart_opt_t *opts, uint32_t baud, uint8_t stop_bits, ui
     return true;
 }
 
+
+bool naeusb_cdc_handle_send_break(uint8_t port, uint16_t wValue)
+{
+    struct usart_state *driver = get_nth_available_driver(port);
+    if (!driver) return false;
+
+    switch(wValue) {
+        case 0xFFFF:
+            usart_tx_break(driver);
+            return true;
+        case 0x0000:
+            usart_enableIO(driver);
+            return true;
+        default:
+        return true;
+    }
+}
