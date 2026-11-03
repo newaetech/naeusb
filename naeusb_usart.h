@@ -22,6 +22,9 @@
 #define USART_TX_BUF_SZ 256
 #define USART_RX_BUF_SZ 1024*6
 
+#define USART_XON 0x11
+#define USART_XOFF 0x13
+
 struct dma_state {
     // uint8_t buf[USART_BUF_SZ];
     Pdc *pdc;
@@ -58,8 +61,15 @@ struct usart_state {
     uint8_t cdc_enabled;
     uint8_t cdc_supported;
     uint8_t cdc_os_enabled;
+
     uint8_t xonxoff_enabled;
     uint8_t currently_xoff;
+
+    union {
+        uint8_t *xonxoff_last_rx_ptr;
+        uint32_t xonxoff_last_rx;
+    };
+    
     uint8_t usart_id;
     uint32_t errors;
 };

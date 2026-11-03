@@ -230,6 +230,8 @@ void ctrl_usart_cb(void)
         driver->xonxoff_enabled = udd_g_ctrlreq.payload[0];
         if (!driver->xonxoff_enabled) {
             driver->currently_xoff = 0;
+        } else {
+            driver->xonxoff_last_rx = usart_dma_ptr(&driver->rx_st);
         }
         return;
     }
