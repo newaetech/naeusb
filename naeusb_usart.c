@@ -20,6 +20,7 @@
 #define USART_WVREQ_NUMWAIT_TX 0x0018
 #define USART_WVREQ_XONXOFF 0x0020
 #define USART_WVREQ_BUFSZ 0x0021
+#define USART_WVREQ_USART_STATUS 0x0022
 
 #define USART_XON 0x11
 #define USART_XOFF 0x13
@@ -129,7 +130,15 @@ bool ctrl_usart_in(void)
         udd_g_ctrlreq.payload_size = 4;
         word2buf(respbuf, buf_sizes);
         return true;
+    case USART_WVREQ_USART_STATUS:
+        uint32_t status = usart_get_status(driver->usart);
+        udd_g_ctrlreq.payload = respbuf;
+        udd_g_ctrlreq.payload_size = 5;
+        word2buf(respbuf, status);
+        respbuf[4] = usart_is_io_low(driver);
+    return true;
     }
+
 
     return false;
 }
@@ -230,6 +239,8 @@ void ctrl_usart_cb(void)
         driver->xonxoff_enabled = udd_g_ctrlreq.payload[0];
         if (!driver->xonxoff_enabled) {
             driver->currently_xoff = 0;
+        } else {
+            driver->xonxoff_last_rx = usart_dma_ptr(&driver->rx_st);
         }
         return;
     }
