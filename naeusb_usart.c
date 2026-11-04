@@ -236,11 +236,13 @@ void ctrl_usart_cb(void)
         usart_disable_dma(driver);
         return ;
     case USART_WVREQ_XONXOFF:
-        driver->xonxoff_enabled = udd_g_ctrlreq.payload[0];
+        driver->xonxoff_enabled = udd_g_ctrlreq.payload[0] > 0;
         if (!driver->xonxoff_enabled) {
             driver->currently_xoff = 0;
+            // usart_disable_interrupt(driver->usart, UART_IDR_RXRDY);
         } else {
             driver->xonxoff_last_rx = usart_dma_ptr(&driver->rx_st);
+            // usart_enable_interrupt(driver->usart, UART_IER_RXRDY);
         }
         return;
     }

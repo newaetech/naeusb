@@ -31,7 +31,7 @@ struct usart_state USART0_ST = {
 ISR(USART0_Handler)
 {
 	handle_rx_usart_overrun_int(&USART0_ST);
-
+    // handle_sw_flow_control_int(&USART0_ST);
 }
 
 void usart0_enableIO(void)

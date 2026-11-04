@@ -838,10 +838,10 @@ iram_size_t udi_cdc_multi_get_nb_received_data(uint8_t port)
 #if UDI_CDC_PORT_NB == 1 // To optimize code
 	port = 0;
 #endif
-	flags = cpu_irq_save();
+	// flags = cpu_irq_save();
 	pos = udi_cdc_rx_pos[port];
 	nb_received = udi_cdc_rx_buf_nb[port][udi_cdc_rx_buf_sel[port]] - pos;
-	cpu_irq_restore(flags);
+	// cpu_irq_restore(flags);
 	return nb_received;
 }
 
@@ -929,12 +929,12 @@ udi_cdc_read_buf_loop_wait:
 	buf_sel = udi_cdc_rx_buf_sel[port];
 	again = pos >= udi_cdc_rx_buf_nb[port][buf_sel];
 	cpu_irq_restore(flags);
-	while (again) {
-		if (!udi_cdc_data_running) {
-			return size;
-		}
-		goto udi_cdc_read_buf_loop_wait;
-	}
+	// while (again) {
+	// 	if (!udi_cdc_data_running) {
+	// 		return size;
+	// 	}
+	// 	goto udi_cdc_read_buf_loop_wait;
+	// }
 
 	// Read data
 	copy_nb = udi_cdc_rx_buf_nb[port][buf_sel] - pos;
@@ -948,6 +948,7 @@ udi_cdc_read_buf_loop_wait:
 	udi_cdc_rx_start(port);
 
 	if (size) {
+		return size;
 		goto udi_cdc_read_buf_loop_wait;
 	}
 	return 0;
@@ -1014,7 +1015,7 @@ iram_size_t udi_cdc_multi_get_free_tx_buffer(uint8_t port)
 	port = 0;
 #endif
 
-	flags = cpu_irq_save();
+	// flags = cpu_irq_save();
 	buf_sel = udi_cdc_tx_buf_sel[port];
 	buf_sel_nb = udi_cdc_tx_buf_nb[port][buf_sel];
 	if (buf_sel_nb == UDI_CDC_TX_BUFFERS) {
@@ -1029,7 +1030,7 @@ iram_size_t udi_cdc_multi_get_free_tx_buffer(uint8_t port)
 		}
 	}
 	retval = UDI_CDC_TX_BUFFERS - buf_sel_nb;  
-	cpu_irq_restore(flags);
+	// cpu_irq_restore(flags);
 	return retval;
 }
 

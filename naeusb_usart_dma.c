@@ -102,6 +102,8 @@ void setup_usart_dma(struct usart_state *ust)
     npacket.ul_size = 0;
     pdc_rx_init(ust->rx_st.pdc, &packet, &npacket);
 
+    ust->currently_xoff = 0;
+    ust->xonxoff_enabled = 0;
 
     usart_init_rs232(ust->usart, &ust->opts, sysclk_get_cpu_hz());
     usart_enable_tx(ust->usart);
@@ -141,16 +143,26 @@ int check_tx(struct usart_state *ust)
     return 0;
 }
 
-// TODO: Check edge cases
+/*
+    Read len data from ust's rx buffer into buf
+
+    Temporarily disables DMA
+
+    WARNING: Because this function disables DMA briefly, if more than one character is received between
+        the disabling and enabling of DMA, those characters can be lost. As such, avoid calling this too often
+
+    Returns the length of data written
+*/
 uint16_t usart_dma_read(struct usart_state *ust, uint8_t *buf, uint16_t len)
 {
     struct dma_state *dst = &ust->rx_st;
     len = min(usart_inwait(dst), len);
-    pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS);
+    // pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS);
     check_rx(ust);
 
     if (is_usart_rx_overrun(dst)) {
         // scenario 3: overrun, should be handled by others by setting up correct read head?
+        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS);
         uint32_t cur_ptr = usart_dma_ptr(dst);
         dst->buf_head = cur_ptr;
         #ifdef USART_SW_FLOW_CONTROL
@@ -160,6 +172,7 @@ uint16_t usart_dma_read(struct usart_state *ust, uint8_t *buf, uint16_t len)
             usart_dma_write(ust, &xon, 1);
         }
         #endif
+        pdc_enable_transfer(ust->pdc, PERIPH_PTCR_RXTEN);
     }
 
     // scenario 0: no wrap
@@ -175,7 +188,9 @@ uint16_t usart_dma_read(struct usart_state *ust, uint8_t *buf, uint16_t len)
         struct pdc_packet npacket;
         npacket.ul_addr = dst->buf_st;
         npacket.ul_size = dst->buf_head - dst->buf_st;
+        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS);
         pdc_rx_init(dst->pdc, NULL, &npacket);
+        pdc_enable_transfer(ust->pdc, PERIPH_PTCR_RXTEN);
         check_rx(ust);
     } else {
         uint16_t len_to_end = dst->buf_end - dst->buf_head; //USART0_RX_BUF_END - USART0_DMA_STATE.rx_buf_head;
@@ -188,7 +203,9 @@ uint16_t usart_dma_read(struct usart_state *ust, uint8_t *buf, uint16_t len)
 
             // there's more space available in buffer, so update current packet to reflect that.
             // can't write to just CNT via API, so need to touch reg directly
+            pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS);
             dst->pdc->PERIPH_RCR = dst->buf_head - usart_dma_ptr(dst);
+            pdc_enable_transfer(ust->pdc, PERIPH_PTCR_RXTEN);
             check_rx(ust);
 
         // scenario 2: wrapped, read wraps
@@ -197,6 +214,7 @@ uint16_t usart_dma_read(struct usart_state *ust, uint8_t *buf, uint16_t len)
             memcpy(buf, dst->buf_head_ptr, len_to_end);
 
             // update current packet to go to end of buffer
+            pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS);
             dst->pdc->PERIPH_RCR = dst->buf_end - usart_dma_ptr(dst); //USART0_RX_BUF_END - pdc_read_rx_ptr(pdc);
 
             // read from beginning of next buffer
@@ -209,6 +227,7 @@ uint16_t usart_dma_read(struct usart_state *ust, uint8_t *buf, uint16_t len)
             npacket.ul_addr = dst->buf_st; //USART0_RX_BUF_ST;
             npacket.ul_size = dst->buf_head - dst->buf_st; //USART0_DMA_STATE.rx_buf_head - USART0_RX_BUF_ST;
             pdc_rx_init(dst->pdc, NULL, &npacket);
+            pdc_enable_transfer(ust->pdc, PERIPH_PTCR_RXTEN);
             check_rx(ust);
         }
     }
@@ -282,7 +301,10 @@ uint16_t usart_dma_write(struct usart_state *ust, uint8_t *buf, uint16_t len)
             volatile int j = 12;
         }
     }
-    pdc_enable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
+
+    if (!ust->currently_xoff) {
+        pdc_enable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
+    }
     return len;
 }
 
@@ -316,12 +338,13 @@ void my_callback_rx_notify(uint8_t port)
     // uint8_t tmp[128];
     // struct usart_state *ust = get_nth_available_driver(port);
 
-    // volatile iram_size_t num_char = min(udi_cdc_multi_get_nb_received_data(port), sizeof(tmp));
+    // volatile iram_size_t num_char = min(min(udi_cdc_multi_get_nb_received_data(port), sizeof(tmp)), 
+    //                                 usart_free_space(&ust->tx_st));
 
-    // while (num_char >= 0) {
-    //     num_char = min(udi_cdc_multi_get_nb_received_data(port), sizeof(tmp));
-    //     udi_cdc_multi_read_buf(port, tmp, min(num_char, ));
+    // while (num_char > 0) {
+    //     udi_cdc_multi_read_buf(port, tmp, num_char);
     //     usart_dma_write(ust, tmp, num_char);
+    //     num_char = min(min(udi_cdc_multi_get_nb_received_data(port), sizeof(tmp)), usart_free_space(&ust->tx_st));
     // }
 
     // cpu_irq_restore(flags);
@@ -361,6 +384,7 @@ void handle_rx_usart_overrun_int(struct usart_state *ust)
 	status = usart_get_status(ust->usart);
 
     if (status & US_CSR_RXBUFF) {
+        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS);
         struct pdc_packet packet;
         struct pdc_packet npacket;
         CURRENT_ERRORS |= CW_ERR_USART_RX_OVERFLOW;
@@ -392,5 +416,25 @@ void handle_rx_usart_overrun_int(struct usart_state *ust)
         npacket.ul_addr = ust->rx_st.buf_st;
         npacket.ul_size = ust->rx_st.buf_sz;
         pdc_rx_init(ust->rx_st.pdc, &packet, &npacket);
+        pdc_enable_transfer(ust->pdc, PERIPH_PTCR_RXTEN);
     }
 }
+
+#ifdef USART_SW_FLOW_CONTROL_VER1
+void handle_sw_flow_control_int(struct usart_state *ust)
+{
+	uint32_t status;
+	status = usart_get_status(ust->usart);
+
+    if (status & US_CSR_RXRDY) {
+        uint32_t chr = ust->usart->US_RHR & US_RHR_RXCHR_Msk;
+        if (chr == USART_XON) {
+            pdc_enable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
+            ust->currently_xoff = 0;
+        } else if (chr == USART_XOFF) {
+            pdc_disable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
+            ust->currently_xoff = 1;
+        }
+    }
+}
+#endif
