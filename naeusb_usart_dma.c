@@ -85,6 +85,7 @@ void setup_usart_dma(struct usart_state *ust)
 {
     struct pdc_packet packet;
     struct pdc_packet npacket;
+    CURRENT_ERRORS &= ~(CW_ERR_USART_RX | CW_ERR_USART_RX_OVERFLOW | CW_ERR_USART_TX | CW_ERR_USART_TX_OVERFLOW); // clear usart errs
     pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS | PERIPH_PTCR_TXTDIS);
 
     // setup tx
@@ -113,12 +114,14 @@ void check_rx(struct usart_state *ust)
 {
     struct dma_state *dst = &ust->rx_st;
     if ((ust->pdc->PERIPH_RPR + ust->pdc->PERIPH_RCR) > ust->rx_st.buf_end) {
-        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS | PERIPH_PTCR_TXTDIS);
-        while(1);
+        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS);
+        CURRENT_ERRORS |= CW_ERR_USART_RX;
+        return -1;
     } 
     if ((ust->pdc->PERIPH_RNPR + ust->pdc->PERIPH_RNCR) > ust->rx_st.buf_end) {
-        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS | PERIPH_PTCR_TXTDIS);
-        while(1);
+        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS);
+        CURRENT_ERRORS |= CW_ERR_USART_RX;
+        return -1;
     }
 }
 
@@ -126,11 +129,13 @@ int check_tx(struct usart_state *ust)
 {
     struct dma_state *dst = &ust->tx_st;
     if ((ust->pdc->PERIPH_TPR + ust->pdc->PERIPH_TCR) > ust->tx_st.buf_end) {
-        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS | PERIPH_PTCR_TXTDIS);
+        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_TXTDIS);
+        CURRENT_ERRORS |= CW_ERR_USART_TX;
         return -1;
     } 
     if ((ust->pdc->PERIPH_TNPR + ust->pdc->PERIPH_TNCR) > ust->tx_st.buf_end) {
-        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS | PERIPH_PTCR_TXTDIS);
+        pdc_disable_transfer(ust->pdc, PERIPH_PTCR_TXTDIS);
+        CURRENT_ERRORS |= CW_ERR_USART_TX;
         return -1;
     }
     return 0;
@@ -176,7 +181,6 @@ uint16_t usart_dma_read(struct usart_state *ust, uint8_t *buf, uint16_t len)
         uint16_t len_to_end = dst->buf_end - dst->buf_head; //USART0_RX_BUF_END - USART0_DMA_STATE.rx_buf_head;
 
         // scenario 1: wrapped, read stops before end
-        // TODO: verif that this can't go past the end
         if (len_to_end >= len) {
             // don't read past end of buffer
             memcpy(buf, dst->buf_head_ptr, len);
@@ -218,13 +222,14 @@ uint16_t usart_dma_write(struct usart_state *ust, uint8_t *buf, uint16_t len)
 {
     struct dma_state *dst = &ust->tx_st;
     len = min(usart_free_space(dst), len);
-    pdc_disable_transfer(ust->pdc, PERIPH_PTCR_TXTDIS);
+    pdc_disable_transfer(ust->pdc, PERIPH_PTCR_TXTDIS); // need to disable tx to avoid issues with read-write on registers
+
     if (!is_dma_wrapped(dst)) {
         // do math here with registers?
         uint16_t len_to_end = dst->buf_end - (dst->pdc->PERIPH_TPR + dst->pdc->PERIPH_TCR);//dst->buf_end - dst->buf_head;
 
         // scenario 1, not wrapped, write stops before end
-        if (len_to_end > len) {
+        if (len_to_end >= len) {
             //copy into buffer
             memcpy(dst->buf_head_ptr, buf, len);
 
@@ -358,6 +363,7 @@ void handle_rx_usart_overrun_int(struct usart_state *ust)
     if (status & US_CSR_RXBUFF) {
         struct pdc_packet packet;
         struct pdc_packet npacket;
+        CURRENT_ERRORS |= CW_ERR_USART_RX_OVERFLOW;
 
         // mark that packets have been dropped so that we know we're not trying to preserve data
         // just dump into buffer
@@ -388,22 +394,3 @@ void handle_rx_usart_overrun_int(struct usart_state *ust)
         pdc_rx_init(ust->rx_st.pdc, &packet, &npacket);
     }
 }
-
-#ifdef USART_SW_FLOW_CONTROL
-void handle_sw_flow_control_int(struct usart_state *ust)
-{
-	uint32_t status;
-	status = usart_get_status(ust->usart);
-
-    if (status & US_CSR_RXRDY) {
-        uint32_t chr = ust->usart->US_RHR & US_RHR_RXCHR_Msk;
-        if (chr == USART_XON) {
-            pdc_enable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
-            ust->currently_xoff = 0;
-        } else if (chr == USART_XOFF) {
-            pdc_disable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
-            ust->currently_xoff = 1;
-        }
-    }
-}
-#endif
