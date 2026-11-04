@@ -8,7 +8,7 @@
 #define RSTC_CR_KEY_PASSWD RSTC_CR_KEY(0xA5)
 #endif
 
-uint8_t LED_SETTING = 0;
+uint8_t LED_SETTING = 2;
 uint16_t CURRENT_ERRORS = 0;
 
 volatile const uint8_t fw_major = FW_VER_MAJOR;

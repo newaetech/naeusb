@@ -30,6 +30,8 @@ extern uint16_t CURRENT_ERRORS;
 
 #define CW_ERR_USART_RX_OVERFLOW (1 << 0)
 #define CW_ERR_USART_TX_OVERFLOW (1 << 1)
+#define CW_ERR_USART_RX (1 << 8)
+#define CW_ERR_USART_TX (1 << 9)
 
 void naeusb_register_handlers(void); // call to register common USB handler functions (should be called in main)
 
