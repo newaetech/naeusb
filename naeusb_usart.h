@@ -18,8 +18,8 @@
 #define REQ_CDC_SETTINGS_EN 0x31
 #define REQ_FPGASPI1_XFER 0x35
 
-#define USART_BUF_SZ 256
-#define USART_TX_BUF_SZ 256
+// #define USART_BUF_SZ 256
+#define USART_TX_BUF_SZ 512
 #define USART_RX_BUF_SZ 1024*6
 
 #define USART_XON 0x11

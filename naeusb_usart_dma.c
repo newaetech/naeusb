@@ -1,3 +1,6 @@
+/*
+    NOTE: Also has CDC functions
+*/
 #include <asf.h>
 #include <string.h>
 #include "circbuffer.h"
@@ -38,7 +41,9 @@ int is_usart_rx_overrun(struct dma_state *dst);
 
 
 
-// 
+/*
+    Number of characters in DMA buffer
+*/
 uint16_t usart_inwait(struct dma_state *dst)
 {
 
@@ -62,7 +67,7 @@ uint16_t usart_inwait(struct dma_state *dst)
 
 uint16_t usart_free_space(struct dma_state *dst)
 {
-    return USART_BUF_SZ - usart_inwait(dst);
+    return dst->buf_sz - usart_inwait(dst);
 }
 
 int is_usart_rx_overrun(struct dma_state *dst)
@@ -81,6 +86,9 @@ static void setup_dma_state(struct dma_state *dst, uint16_t size)
     dst->dropped = 0;
 }
 
+/*
+    Setup the DMA and USART for our DMA. Also updates the USART's settings
+*/
 void setup_usart_dma(struct usart_state *ust)
 {
     struct pdc_packet packet;
@@ -112,7 +120,10 @@ void setup_usart_dma(struct usart_state *ust)
     usart_enable_interrupt(ust->usart, UART_IER_RXBUFF);
 }
 
-void check_rx(struct usart_state *ust)
+/*
+    Verify that RX DMA settings don't go outside of DMA buffer
+*/
+int check_rx(struct usart_state *ust)
 {
     struct dma_state *dst = &ust->rx_st;
     if ((ust->pdc->PERIPH_RPR + ust->pdc->PERIPH_RCR) > ust->rx_st.buf_end) {
@@ -125,8 +136,12 @@ void check_rx(struct usart_state *ust)
         CURRENT_ERRORS |= CW_ERR_USART_RX;
         return -1;
     }
+    return 0;
 }
 
+/*
+    Verify that TX DMA settings don't go outside of DMA buffer
+*/
 int check_tx(struct usart_state *ust)
 {
     struct dma_state *dst = &ust->tx_st;
@@ -151,12 +166,14 @@ int check_tx(struct usart_state *ust)
     WARNING: Because this function disables DMA briefly, if more than one character is received between
         the disabling and enabling of DMA, those characters can be lost. As such, avoid calling this too often
 
-    Returns the length of data written
+    Returns the length of data read
 */
 uint16_t usart_dma_read(struct usart_state *ust, uint8_t *buf, uint16_t len)
 {
     struct dma_state *dst = &ust->rx_st;
     len = min(usart_inwait(dst), len);
+    if (!len) return 0;
+	irqflags_t flags = cpu_irq_save();
     // pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS);
     check_rx(ust);
 
@@ -233,30 +250,47 @@ uint16_t usart_dma_read(struct usart_state *ust, uint8_t *buf, uint16_t len)
     }
     dst->dropped = 0;
     pdc_enable_transfer(ust->pdc, PERIPH_PTCR_RXTEN);
+	cpu_irq_restore(flags);
     return len;
 }
 
-// TODO: Check edge cases
+/*
+    Read len data from buf into ust's TX buffer.
+
+    Temporarily disables DMA
+
+    Returns the length of data written
+*/
 uint16_t usart_dma_write(struct usart_state *ust, uint8_t *buf, uint16_t len)
 {
     struct dma_state *dst = &ust->tx_st;
     len = min(usart_free_space(dst), len);
+    if (!len) return 0;
+	irqflags_t flags = cpu_irq_save();
     pdc_disable_transfer(ust->pdc, PERIPH_PTCR_TXTDIS); // need to disable tx to avoid issues with read-write on registers
 
     if (!is_dma_wrapped(dst)) {
         // do math here with registers?
-        uint16_t len_to_end = dst->buf_end - (dst->pdc->PERIPH_TPR + dst->pdc->PERIPH_TCR);//dst->buf_end - dst->buf_head;
+        uint16_t len_to_end = dst->buf_end - dst->buf_head;//(dst->pdc->PERIPH_TPR + dst->pdc->PERIPH_TCR);//dst->buf_end - dst->buf_head;
 
         // scenario 1, not wrapped, write stops before end
-        if (len_to_end >= len) {
+        if (len_to_end > len) {
             //copy into buffer
             memcpy(dst->buf_head_ptr, buf, len);
+            if ((dst->buf_head + len) > dst->buf_end){
+                volatile int i = 0;
+                while(1);
+            }
 
             // increase buf_head by len
             dst->buf_head += len;
 
             // increase PDC counter by len
+            // pdc_disable_transfer(ust->pdc, PERIPH_PTCR_TXTDIS); // need to disable tx to avoid issues with read-write on registers
             dst->pdc->PERIPH_TCR += len;
+            // if (!ust->currently_xoff) {
+            //     pdc_enable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
+            // }
 
             if (check_tx(ust)) {
                 volatile int j = 256;
@@ -266,8 +300,13 @@ uint16_t usart_dma_write(struct usart_state *ust, uint8_t *buf, uint16_t len)
         } else {
             // copy to end of buffer
             memcpy(dst->buf_head_ptr, buf, len_to_end);
+            if ((dst->buf_head + len_to_end) > dst->buf_end){
+                volatile int i = 1;
+                while(1);
+            }
 
             // update current count to go to end of buffer
+            // pdc_disable_transfer(ust->pdc, PERIPH_PTCR_TXTDIS); // need to disable tx to avoid issues with read-write on registers
             dst->pdc->PERIPH_TCR += len_to_end;
 
             // copy the rest of the input buffer into the DMA buffer
@@ -278,6 +317,9 @@ uint16_t usart_dma_write(struct usart_state *ust, uint8_t *buf, uint16_t len)
             npacket.ul_addr = dst->buf_st;
             npacket.ul_size = len - len_to_end;
             pdc_tx_init(dst->pdc, NULL, &npacket);
+            // if (!ust->currently_xoff) {
+            //     pdc_enable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
+            // }
 
             // point head at that new point
             dst->buf_head = dst->buf_st + len - len_to_end;
@@ -290,12 +332,20 @@ uint16_t usart_dma_write(struct usart_state *ust, uint8_t *buf, uint16_t len)
 
         // copy new data into buffer (note that len is valid from min() call above)
         memcpy(dst->buf_head_ptr, buf, len);
+        if ((dst->buf_head + len) > dst->buf_end){
+            volatile int i = 5;
+            while(1);
+        }
 
         // increase buf_head by len
         dst->buf_head += len;
 
         // increase PDC next counter by len
+        // pdc_disable_transfer(ust->pdc, PERIPH_PTCR_TXTDIS); // need to disable tx to avoid issues with read-write on registers
         dst->pdc->PERIPH_TNCR += len;
+        // if (!ust->currently_xoff) {
+        //     pdc_enable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
+        // }
 
         if (check_tx(ust)) {
             volatile int j = 12;
@@ -305,10 +355,10 @@ uint16_t usart_dma_write(struct usart_state *ust, uint8_t *buf, uint16_t len)
     if (!ust->currently_xoff) {
         pdc_enable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
     }
+	cpu_irq_restore(flags);
     return len;
 }
 
-// naeusart because I wouldn't be surpised if usart_register_handlers collides with something
 void naeusart_register_handlers(void)
 {
 	for (uint8_t i = 0; i < 4; i++) {
@@ -330,28 +380,12 @@ void usart_disable_dma(struct      usart_state *ust)
     pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS | PERIPH_PTCR_TXTDIS);
 }
 
-#define CDC_BUF_SZ 64
-
+// Callback for when we receive CDC data. Empty because handled in main()
 void my_callback_rx_notify(uint8_t port)
 {
-    // irqflags_t flags = cpu_irq_save();
-    // uint8_t tmp[128];
-    // struct usart_state *ust = get_nth_available_driver(port);
-
-    // volatile iram_size_t num_char = min(min(udi_cdc_multi_get_nb_received_data(port), sizeof(tmp)), 
-    //                                 usart_free_space(&ust->tx_st));
-
-    // while (num_char > 0) {
-    //     udi_cdc_multi_read_buf(port, tmp, num_char);
-    //     usart_dma_write(ust, tmp, num_char);
-    //     num_char = min(min(udi_cdc_multi_get_nb_received_data(port), sizeof(tmp)), usart_free_space(&ust->tx_st));
-    // }
-
-    // cpu_irq_restore(flags);
 }
 
-// I think this just tells you data was sent SAM->PC?
-// It's in callback of udd run if n != 0
+// Callback for when we send CDC data. Empty because handled in main()
 void my_callback_tx_empty(uint8_t port)
 {
 
@@ -360,6 +394,7 @@ void my_callback_tx_empty(uint8_t port)
 void my_callback_config(uint8_t port, usb_cdc_line_coding_t * cfg)
 {
     struct usart_state *driver = get_nth_available_driver(port);
+    if (!driver->cdc_enabled) return; // if CDC not enabled, get out of here
 
     usart_fill_opts(&driver->opts, cfg->dwDTERate, cfg->bCharFormat, cfg->bParityType, cfg->bDataBits);
     setup_usart_dma(driver);
@@ -378,6 +413,11 @@ bool cdc_enable(uint8_t port)
     return true;
 }
 
+/*
+    Handle the condition where our RX buffer is full
+
+    Basically just mark that we lost data and setup DMA to write continuously (or as much as possible)
+*/
 void handle_rx_usart_overrun_int(struct usart_state *ust)
 {
 	uint32_t status;
@@ -420,21 +460,83 @@ void handle_rx_usart_overrun_int(struct usart_state *ust)
     }
 }
 
-#ifdef USART_SW_FLOW_CONTROL_VER1
-void handle_sw_flow_control_int(struct usart_state *ust)
+// in CDC to avoid running usart_dma_read/write() too often
+static uint8_t cdctmp[512];
+void handle_cdc_txrx(void)
 {
-	uint32_t status;
-	status = usart_get_status(ust->usart);
+    for (uint8_t i = 0; i < 4; i++) {
 
-    if (status & US_CSR_RXRDY) {
-        uint32_t chr = ust->usart->US_RHR & US_RHR_RXCHR_Msk;
-        if (chr == USART_XON) {
-            pdc_enable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
-            ust->currently_xoff = 0;
-        } else if (chr == USART_XOFF) {
-            pdc_disable_transfer(ust->pdc, PERIPH_PTCR_TXTEN);
-            ust->currently_xoff = 1;
+        // note: be very careful here, these calls could do weird things
+        // need to test well, esp with stream mode
+        struct usart_state *driver = get_nth_available_driver(i);
+        if (!driver) continue; // skip if driver doesn't exist
+        if (!driver->cdc_supported) continue; //skip if CDC not supported
+        if (!driver->cdc_os_enabled) continue; //skip if OS isn't expecting CDC to work
+        if (!driver->cdc_enabled) continue; //skip if CDC mode not enabled
+
+
+        /*
+            NOTE: For RX, doing usart_dma_read() at higher baud rates can cause us to miss characters
+            This is because that function disables the DMA while we do stuff to the register, meaning
+            if we get more than one character in that time, it will be lost
+
+            There should be some sort of tradeoff between the length of this delay and characters lost,
+            where longer delays will perform better up to a point
+        */
+        // minimum between chars available, free CDC txt space, and size of cdctmp buf
+        uint16_t num_rx = usart_inwait(&driver->rx_st);
+        if (num_rx) {
+            for (volatile uint32_t j = 0; j < 10000; j++);
+            num_rx = min(usart_inwait(&driver->rx_st), min(udi_cdc_multi_get_free_tx_buffer(i), sizeof(cdctmp)));
+            num_rx = usart_dma_read(driver, cdctmp, num_rx);
+            udi_cdc_multi_write_buf(i, cdctmp, num_rx);
         }
+
+        // minimum between chars free, free tx space, and size of cdctmp buf
+        // while (udi_cdc_multi_is_rx_ready(i) && (usart_free_space(&driver->tx_st))) {
+        //     uint8_t c = udi_cdc_multi_getc(i);
+        //     usart_dma_write(driver, &c, 1);
+        // }
+        uint16_t num_tx = udi_cdc_multi_get_nb_received_data(i);//usart_free_space(&driver->tx_st);
+        if (num_tx) {
+            for (volatile uint32_t j = 0; j < 2000; j++);
+            num_tx = min(num_tx, min(usart_free_space(&driver->tx_st), sizeof(cdctmp)));
+            udi_cdc_multi_read_no_polling(i, cdctmp, num_tx);
+            usart_dma_write(driver, cdctmp, num_tx);
+        }
+
+        // volatile uint32_t i = 0;
+        // for (; i < 5000; i++);
     }
 }
-#endif
+
+void handle_sw_flow_control(void)
+{
+    #ifdef USART_SW_FLOW_CONTROL
+    for (uint8_t i = 0; i < 4; i++) {
+        struct usart_state *driver = get_nth_available_driver(i);
+        if (!driver) continue; // skip if driver doesn't exist
+        if (!driver->xonxoff_enabled) continue;
+
+
+        uint32_t rx_ptr = usart_dma_ptr(&driver->rx_st);
+        while (driver->xonxoff_last_rx != rx_ptr) {
+
+            uint8_t cur_char = *driver->xonxoff_last_rx_ptr;
+            if (cur_char == USART_XON) {
+                //doxon
+                pdc_enable_transfer(driver->pdc, PERIPH_PTCR_TXTEN);
+                driver->currently_xoff = 0;
+            } else if (cur_char == USART_XOFF) {
+                // doxoff
+                pdc_disable_transfer(driver->pdc, PERIPH_PTCR_TXTDIS);
+                driver->currently_xoff = 1;
+            }
+
+            if (driver->xonxoff_last_rx++ > driver->rx_st.buf_end) {
+                driver->xonxoff_last_rx = driver->rx_st.buf_st;
+            }
+        }
+    }
+    #endif
+}

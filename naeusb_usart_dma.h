@@ -35,8 +35,11 @@ static inline uint32_t usart_dma_nptr(struct dma_state *dst)
 static inline char is_dma_wrapped(struct dma_state *dst)
 {
     if (dst->is_tx) {
-        return dst->pdc->PERIPH_TNCR != 0;
+        return (dst->buf_head < usart_dma_ptr(dst)); //dst->pdc->PERIPH_TNCR != 0;
     } else {
         return (dst->buf_head > usart_dma_ptr(dst)) || ((dst->buf_head != dst->buf_st) && (dst->dropped));
     }
 }
+
+void handle_cdc_txrx(void);
+void handle_sw_flow_control(void);
