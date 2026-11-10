@@ -19,8 +19,13 @@
 #define REQ_FPGASPI1_XFER 0x35
 
 // #define USART_BUF_SZ 256
-#define USART_TX_BUF_SZ 512
-#define USART_RX_BUF_SZ 1024*6
+#ifndef USART_TX_BUF_SZ
+#define USART_TX_BUF_SZ 1024 * 2
+#endif
+
+#ifndef USART_RX_BUF_SZ
+#define USART_RX_BUF_SZ 1024 * 8
+#endif
 
 #define USART_XON 0x11
 #define USART_XOFF 0x13
@@ -58,6 +63,7 @@ struct usart_state {
 	struct dma_state rx_st;
 
 	sam_usart_opt_t opts;
+    uint8_t enabled;
     uint8_t cdc_enabled;
     uint8_t cdc_supported;
     uint8_t cdc_os_enabled;

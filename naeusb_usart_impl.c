@@ -2,6 +2,10 @@
 #include "naeusb_usart_dma.h"
 #include "pdc.h"
 
+#ifndef CDC_DEFAULT
+#define CDC_DEFAULT 0
+#endif
+
 #ifdef CW_USE_USART0
 // TODO, probably need specific alignment, etc.
 uint8_t USART0_TX_BUF[USART_TX_BUF_SZ];
@@ -21,7 +25,7 @@ struct usart_state USART0_ST = {
         .usart = USART0,
         .is_tx = 0
     },
-    .cdc_enabled = 0,
+    .cdc_enabled = CDC_DEFAULT,
     .cdc_supported = 1,
     .xonxoff_enabled = 0,
     .currently_xoff = 0,
@@ -83,7 +87,7 @@ uint8_t usart0_is_io_low(void)
 #ifdef CW_USE_USART1
 uint8_t USART1_TX_BUF[USART_TX_BUF_SZ];
 uint8_t USART1_RX_BUF[USART_RX_BUF_SZ];
-struct usart_state USART0_ST = {
+struct usart_state USART1_ST = {
     .pdc = PDC_USART1,
     .usart = USART1,
     .tx_st = {
@@ -98,11 +102,11 @@ struct usart_state USART0_ST = {
         .usart = USART1,
         .is_tx = 0
     },
-    .cdc_enabled = 0,
+    .cdc_enabled = CDC_DEFAULT,
     .cdc_supported = 1,
     .xonxoff_enabled = 0,
     .currently_xoff = 0,
-    .usart_id = 0
+    .usart_id = 1
 };
 
 ISR(USART1_Handler)
@@ -176,7 +180,7 @@ uint8_t usart2_is_io_low(void)
 #ifdef CW_USE_USART3
 uint8_t USART3_TX_BUF[USART_TX_BUF_SZ];
 uint8_t USART3_RX_BUF[USART_RX_BUF_SZ];
-struct usart_state USART0_ST = {
+struct usart_state USART3_ST = {
     .pdc = PDC_USART3,
     .usart = USART3,
     .tx_st = {
@@ -191,11 +195,11 @@ struct usart_state USART0_ST = {
         .usart = USART3,
         .is_tx = 0
     },
-    .cdc_enabled = 0,
+    .cdc_enabled = CDC_DEFAULT,
     .cdc_supported = 1,
     .xonxoff_enabled = 0,
     .currently_xoff = 0,
-    .usart_id = 0
+    .usart_id = 3
 };
 
 ISR(USART3_Handler)

@@ -93,6 +93,7 @@ void setup_usart_dma(struct usart_state *ust)
 {
     struct pdc_packet packet;
     struct pdc_packet npacket;
+    usart_enableIO(ust);
     CURRENT_ERRORS &= ~(CW_ERR_USART_RX | CW_ERR_USART_RX_OVERFLOW | CW_ERR_USART_TX | CW_ERR_USART_TX_OVERFLOW); // clear usart errs
     pdc_disable_transfer(ust->pdc, PERIPH_PTCR_RXTDIS | PERIPH_PTCR_TXTDIS);
 
@@ -118,6 +119,7 @@ void setup_usart_dma(struct usart_state *ust)
     usart_enable_rx(ust->usart);
     pdc_enable_transfer(ust->pdc, PERIPH_PTCR_RXTEN | PERIPH_PTCR_TXTEN);
     usart_enable_interrupt(ust->usart, UART_IER_RXBUFF);
+    ust->enabled = 1;
 }
 
 /*
@@ -470,6 +472,7 @@ void handle_cdc_txrx(void)
         // need to test well, esp with stream mode
         struct usart_state *driver = get_nth_available_driver(i);
         if (!driver) continue; // skip if driver doesn't exist
+        if (!driver->enabled) continue; // skip if usart not enabled
         if (!driver->cdc_supported) continue; //skip if CDC not supported
         if (!driver->cdc_os_enabled) continue; //skip if OS isn't expecting CDC to work
         if (!driver->cdc_enabled) continue; //skip if CDC mode not enabled
@@ -486,10 +489,12 @@ void handle_cdc_txrx(void)
         // minimum between chars available, free CDC txt space, and size of cdctmp buf
         uint16_t num_rx = usart_inwait(&driver->rx_st);
         if (num_rx) {
-            for (volatile uint32_t j = 0; j < 10000; j++);
+            for (volatile uint32_t j = 0; j < 1000; j++);
             num_rx = min(usart_inwait(&driver->rx_st), min(udi_cdc_multi_get_free_tx_buffer(i), sizeof(cdctmp)));
             num_rx = usart_dma_read(driver, cdctmp, num_rx);
-            udi_cdc_multi_write_buf(i, cdctmp, num_rx);
+            while (num_rx) {
+                num_rx = udi_cdc_multi_write_buf(i, cdctmp, num_rx);
+            }
         }
 
         // minimum between chars free, free tx space, and size of cdctmp buf
@@ -499,10 +504,12 @@ void handle_cdc_txrx(void)
         // }
         uint16_t num_tx = udi_cdc_multi_get_nb_received_data(i);//usart_free_space(&driver->tx_st);
         if (num_tx) {
-            for (volatile uint32_t j = 0; j < 2000; j++);
+            for (volatile uint32_t j = 0; j < 1000; j++);
             num_tx = min(num_tx, min(usart_free_space(&driver->tx_st), sizeof(cdctmp)));
-            udi_cdc_multi_read_no_polling(i, cdctmp, num_tx);
-            usart_dma_write(driver, cdctmp, num_tx);
+            if (num_tx) {
+                num_tx = udi_cdc_multi_read_no_polling(i, cdctmp, num_tx);
+                usart_dma_write(driver, cdctmp, num_tx);
+            }
         }
 
         // volatile uint32_t i = 0;
