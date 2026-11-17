@@ -126,6 +126,7 @@ void usart1_enableIO(void)
         gpio_configure_pin(PIN_USART1_RXD, PIN_USART1_RXD_FLAGS);
         gpio_configure_pin(PIN_USART1_TXD, PIN_USART1_TXD_FLAGS);
 	#endif
+	irq_register_handler(USART1_IRQn, 3);
 }
 
 void usart1_tx_break(void)
@@ -218,6 +219,7 @@ void usart3_enableIO(void)
         gpio_configure_pin(PIN_USART3_RXD, PIN_USART3_RXD_FLAGS);
         gpio_configure_pin(PIN_USART3_TXD, PIN_USART3_TXD_FLAGS);
 	#endif
+	irq_register_handler(USART3_IRQn, 3);
 }
 
 void usart3_tx_break(void)
