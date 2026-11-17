@@ -1,4 +1,5 @@
 #pragma once
+#include <asf.h>
 #include "naeusb.h"
 
 // Ctrl Write
@@ -19,6 +20,7 @@
 #define REQ_FPGASPI1_XFER 0x35
 
 // #define USART_BUF_SZ 256
+// NOTE: Can be defined in naeusb_board_config.h
 #ifndef USART_TX_BUF_SZ
 #define USART_TX_BUF_SZ 1024 * 2
 #endif
