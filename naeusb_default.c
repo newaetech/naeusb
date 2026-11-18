@@ -2,7 +2,10 @@
 #include "usart_driver.h"
 #include <string.h>
 #include <stdarg.h>
+
+#ifdef LED1_GPIO
 #include "led.h"
+#endif
 
 
 #ifndef RSTC_CR_KEY_PASSWD
