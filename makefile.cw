@@ -15,6 +15,7 @@ OBJDUMP = arm-none-eabi-objdump
 SIZE = arm-none-eabi-size
 AR = arm-none-eabi-ar rcs
 NM = arm-none-eabi-nm
+STRINGS = arm-none-eabi-strings
 CFLAGS += -fdata-sections -ffunction-sections -mlong-calls -g3 -Wall -pipe 
 CFLAGS += -fno-strict-aliasing -Wall -Wstrict-prototypes -Wmissing-prototypes -Wchar-subscripts 
 CFLAGS += -Wcomment -Wformat=2 --param max-inline-insns-single=500
@@ -397,12 +398,14 @@ $(OBJDIR)/%.o : %.S
 %.i : %.c
 	$(CC) -E $(MCU_FLAGS) -I. $(CFLAGS) $< -o $@
 
-version :
-
-	@$(CC) -dD -E $(ALL_CFLAGS) ./config/conf_usb.h -o symbols.txt
-	@grep -o -m 1 "FW_VER_MAJOR.*" ./symbols.txt > version.txt
-	@grep -o -m 1 "FW_VER_MINOR.*" ./symbols.txt >> version.txt
-	@grep -o -m 1 "FW_VER_DEBUG.*" ./symbols.txt >> version.txt
+version: $(TARGET).elf
+	@$(OBJDUMP) --dwarf=macro $< | grep -oE -m 1 '\bFW_VER_MAJOR\b.*' > version.txt
+	@$(OBJDUMP) --dwarf=macro $< | grep -oE -m 1 '\bFW_VER_MINOR\b.*' >> version.txt
+	@$(OBJDUMP) --dwarf=macro $< | grep -oE -m 1 '\bFW_VER_DEBUG\b.*' >> version.txt
+	@printf "FW_DATETIME " >> version.txt
+	@BUILD_TIME=$$($(STRINGS) $< | grep -oE '[0-9]{2}:[0-9]{2}:[0-9]{2}' | head -n 1); \
+	BUILD_DATE=$$($(STRINGS) $< | grep -oE '(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) [ 0-9][0-9] [0-9]{4}' | head -n 1); \
+	printf "%s %s\n" "$$BUILD_TIME" "$$BUILD_DATE" >> version.txt
 
 # Clean all object files specific to this platform
 clean_objs :
