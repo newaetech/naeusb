@@ -2,6 +2,7 @@
 #include "usart_driver.h"
 #include <string.h>
 #include <stdarg.h>
+#include "led.h"
 
 
 #ifndef RSTC_CR_KEY_PASSWD
@@ -49,7 +50,8 @@ void naeusb_sam_cfg_out(void)
         udc_detach();
 
         /* With knowledge that I will rise again, I lay down my life. */
-        while (RSTC->RSTC_SR & RSTC_SR_SRCMP);
+        while (RSTC->RSTC_SR & RSTC_SR_SRCMP) 1;
+
         //RSTC->RSTC_CR |= RSTC_CR_KEY(0xA5) | RSTC_CR_PERRST | RSTC_CR_PROCRST;
 		RSTC->RSTC_CR |= RSTC_CR_KEY_PASSWD | RSTC_CR_PERRST | RSTC_CR_PROCRST;
         while(1);

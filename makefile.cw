@@ -59,7 +59,7 @@ else ifeq ($(TARGET),ChipWhisperer-Nano)
 	CFLAGS += -D__PLAT_NANO__
 	HAL = SAM4S
 	CDC=YES
-	LDFLAGS += --specs=nano.specs --specs=nosys.specs
+	LDFLAGS += --specs=nosys.specs
 	CONF_PATH=./config/conf_usb.h
 else ifeq ($(TARGET),cw521)
 	CFLAGS += -D__SAM3U4E__

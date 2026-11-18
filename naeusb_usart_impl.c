@@ -80,7 +80,7 @@ void usart0_tx_break(void)
 }
 uint8_t usart0_is_io_low(void)
 {
-
+    return 0;
 }
 #endif
 
@@ -155,7 +155,7 @@ void usart1_tx_break(void)
 }
 uint8_t usart1_is_io_low(void)
 {
-
+    return 0;
 }
 #endif
 
@@ -174,7 +174,7 @@ void usart2_tx_break(void)
 }
 uint8_t usart2_is_io_low(void)
 {
-
+    return 0;
 }
 #endif
 
@@ -248,7 +248,7 @@ void usart3_tx_break(void)
 }
 uint8_t usart3_is_io_low(void)
 {
-
+    return 0;
 }
 #endif
 
