@@ -106,8 +106,8 @@ void fpga_program_setup1(uint32_t prog_freq)
 	sysclk_enable_peripheral_clock(FPGA_PROG_USART_ID);
 	usart_init_spi_master(FPGA_PROG_USART, &spiopts, sysclk_get_cpu_hz());
 
-	gpio_configure_pin(PIN_FPGA_CCLK_GPIO, PIN_FPGA_CCLK_USART_FLAGS);
-	gpio_configure_pin(PIN_FPGA_DO_GPIO, PIN_FPGA_DO_USART_FLAGS);
+	gpio_configure_pin(PIN_FPGA_CCLK_GPIO, PIN_FPGA_CCLK_FLAGS);
+	gpio_configure_pin(PIN_FPGA_DO_GPIO, PIN_FPGA_DO_FLAGS);
 	
 	usart_enable_tx(FPGA_PROG_USART);
 	#else
