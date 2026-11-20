@@ -381,6 +381,7 @@ iram_size_t udi_cdc_get_nb_received_data(void);
  * \return \c 1 if a byte is ready to be read.
  */
 bool udi_cdc_is_rx_ready(void);
+iram_size_t udi_cdc_multi_read_no_polling(uint8_t port, void* buf, iram_size_t size);
 
 /**
  * \brief Waits and gets a value on CDC line

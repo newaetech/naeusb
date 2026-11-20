@@ -1,18 +1,24 @@
 #include "naeusb_default.h"
 #include "usart_driver.h"
 #include <string.h>
+#include <stdarg.h>
+
+#ifdef LED1_GPIO
+#include "led.h"
+#endif
 
 
 #ifndef RSTC_CR_KEY_PASSWD
 #define RSTC_CR_KEY_PASSWD RSTC_CR_KEY(0xA5)
 #endif
 
-uint8_t LED_SETTING = 0;
+uint8_t LED_SETTING = 2;
 uint16_t CURRENT_ERRORS = 0;
 
 volatile const uint8_t fw_major = FW_VER_MAJOR;
 volatile const uint8_t fw_minor = FW_VER_MINOR;
 volatile const uint8_t fw_debug = FW_VER_DEBUG;
+
 
 bool naeusb_sam_status_in(void)
 {
@@ -47,7 +53,8 @@ void naeusb_sam_cfg_out(void)
         udc_detach();
 
         /* With knowledge that I will rise again, I lay down my life. */
-        while (RSTC->RSTC_SR & RSTC_SR_SRCMP);
+        while (RSTC->RSTC_SR & RSTC_SR_SRCMP) 1;
+
         //RSTC->RSTC_CR |= RSTC_CR_KEY(0xA5) | RSTC_CR_PERRST | RSTC_CR_PROCRST;
 		RSTC->RSTC_CR |= RSTC_CR_KEY_PASSWD | RSTC_CR_PERRST | RSTC_CR_PROCRST;
         while(1);

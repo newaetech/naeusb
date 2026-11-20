@@ -410,6 +410,7 @@ iram_size_t udi_cdc_read_buf(void* buf, iram_size_t size);
  */
 iram_size_t udi_cdc_read_no_polling(void* buf, iram_size_t size);
 
+iram_size_t udi_cdc_multi_read_no_polling(uint8_t port, void* buf, iram_size_t size);
 /**
  * \brief Gets the number of free byte in TX buffer
  *
